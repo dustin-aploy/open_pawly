@@ -1,0 +1,79 @@
+{
+  "event_id": "event-42",
+  "event_type": "action-proposed",
+  "timestamp": "2026-03-21T10:22:00Z",
+  "agent_id": "recruiting.candidate.coordinator",
+  "pawprint_version": "0.1.0",
+  "decision_id": "decision-42",
+  "outcome": "require_approval",
+  "action": {
+    "name": "send-candidate-message",
+    "approved": false
+  },
+  "original_intent": {
+    "intent_id": "intent-42",
+    "source": "execution_request",
+    "action": {
+      "name": "send-candidate-message",
+      "arguments": {
+        "task": "Candidate raises fairness and accommodation issue"
+      }
+    },
+    "context": {
+      "summary": "Candidate raises fairness and accommodation issue",
+      "confidence": 0.91
+    },
+    "metadata": {}
+  },
+  "normalized_intent": {
+    "intent_id": "intent-42",
+    "source": "execution_request",
+    "action": {
+      "name": "send-candidate-message",
+      "arguments": {
+        "task": "Candidate raises fairness and accommodation issue"
+      }
+    },
+    "context": {
+      "summary": "Candidate raises fairness and accommodation issue",
+      "confidence": 0.91
+    },
+    "metadata": {}
+  },
+  "policy_evaluation": {
+    "type": "require_approval",
+    "reason": "intent triggered handoff conditions: candidate raises fairness, discrimination, or accommodation issue",
+    "reason_codes": ["handoff_triggered"],
+    "matched_rules": [
+      "candidate raises fairness, discrimination, or accommodation issue"
+    ],
+    "risk_score": 0.3,
+    "audit_tags": ["handoff:triggered", "risk:elevated"],
+    "handoff_target": "recruiting-manager"
+  },
+  "runtime_overlays": {
+    "overlay_applied": false,
+    "budget": {
+      "exhausted": false,
+      "warnings": [],
+      "consumed": {}
+    },
+    "merged_decision_type": "require_approval"
+  },
+  "policy_references": [
+    "candidate raises fairness, discrimination, or accommodation issue"
+  ],
+  "matched_policy_rules": [
+    "candidate raises fairness, discrimination, or accommodation issue"
+  ],
+  "final_decision": {
+    "type": "require_approval",
+    "reason": "intent triggered handoff conditions: candidate raises fairness, discrimination, or accommodation issue; budget remains within limits",
+    "reason_codes": ["handoff_triggered", "budget_ok"],
+    "risk_score": 0.3
+  },
+  "reason_codes": ["handoff_triggered", "budget_ok"],
+  "risk_score": 0.3,
+  "escalated_to": "recruiting-manager",
+  "redactions_applied": []
+}

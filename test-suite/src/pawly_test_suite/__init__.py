@@ -1,0 +1,1 @@
+"""Minimal Pawprint validation suite."""

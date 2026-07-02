@@ -1,0 +1,35 @@
+metadata:
+  id: support-triage-worker
+  name: Support Triage Worker
+  description: Reviews inbound support requests and routes actions through explicit Pawprint boundaries.
+  # Pawly uploads action records to Pawly Cloud automatically after local registration.
+  # Authentication is read from `~/.pawly/pawly_auth.yaml`; worker YAML does not store credentials or project settings.
+
+capabilities:
+  - name: safe_reply
+    description: Send a low-risk customer reply that stays within approved guidance.
+  - name: send_external_message
+    description: Contact an external party or channel where review is required first.
+  - name: issue_refund
+    description: Refund a customer account. This worker must not do this directly.
+  - name: answer order status questions
+    description: Respond to routine order-status requests from customers.
+  - name: draft helpful reply
+    description: Draft a safe support reply for a customer.
+  - name: summarize customer issues
+    description: Summarize the current ticket history for a human reviewer.
+  - name: publish_post
+    description: Publish a prepared support update when intelligent scoring is needed.
+
+boundaries:
+  allow:
+    - safe_reply
+    - answer order status questions
+    - draft helpful reply
+    - publish_post
+  review:
+    - send_external_message
+  block:
+    - issue_refund
+    - give legal advice
+    - write legal answer

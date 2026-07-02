@@ -1,0 +1,11 @@
+metadata:
+  name: Support Helper
+  summary: Missing id and boundaries on purpose.
+  description: Missing id and boundaries on purpose.
+capabilities:
+  - name: answer order status questions
+    description: Answer common order status questions.
+handoff:
+  to: human-support
+  when:
+    - refund requested

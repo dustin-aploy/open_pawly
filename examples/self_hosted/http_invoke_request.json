@@ -1,0 +1,17 @@
+{
+  "method": "POST",
+  "url": "https://workers.example.com/support/self-hosted-tier1/invoke",
+  "headers": {
+    "Authorization": "Bearer ${PAW_WORKER_TOKEN}",
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "task": "Draft a password reset reply and route the case to the correct queue",
+    "action": "draft helpful reply",
+    "confidence": 0.93,
+    "metadata": {
+      "request_id": "demo-request-001",
+      "ticket_id": "ticket-4242"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "required_fields": [
+    "worker_id",
+    "generated_at",
+    "summary",
+    "policy_summary",
+    "runtime_overlay_summary"
+  ]
+}

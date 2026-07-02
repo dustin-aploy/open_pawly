@@ -1,0 +1,21 @@
+{
+  "required_fields": [
+    "event_id",
+    "event_type",
+    "timestamp",
+    "agent_id",
+    "pawprint_version",
+    "decision_id",
+    "outcome",
+    "action",
+    "original_intent",
+    "normalized_intent",
+    "policy_evaluation",
+    "runtime_overlays",
+    "policy_references",
+    "matched_policy_rules",
+    "final_decision",
+    "reason_codes",
+    "risk_score"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "worker_id": "operations.runbook.coordinator",
+  "generated_at": "2026-03-21T10:15:00Z",
+  "summary": {
+    "status": "failed",
+    "notes": [
+      "total_decisions=14",
+      "allow=9",
+      "require_approval=3",
+      "deny=2",
+      "simulate=0"
+    ]
+  },
+  "policy_summary": {
+    "status": "failed",
+    "notes": [
+      "total_policy_evaluations=14",
+      "allow=9",
+      "require_approval=3",
+      "deny=2",
+      "simulate=0"
+    ]
+  },
+  "runtime_overlay_summary": {
+    "notes": [
+      "overlay_decisions=1",
+      "budget_exhausted=0",
+      "budget_warning_decisions=1"
+    ]
+  }
+}

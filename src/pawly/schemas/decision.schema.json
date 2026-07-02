@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["type", "reason"],
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["allow", "deny", "require_approval", "simulate"]
+    },
+    "reason": { "type": "string", "minLength": 1 },
+    "source": { "type": "string" },
+    "reason_codes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "matched_rules": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "risk_score": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+    "rewritten_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "arguments"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "arguments": { "type": "object" },
+        "target": { "type": "string" }
+      }
+    },
+    "audit_tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "worker_id": { "type": "string" }
+  }
+}

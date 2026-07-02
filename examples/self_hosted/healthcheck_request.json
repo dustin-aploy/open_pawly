@@ -1,0 +1,5 @@
+{
+  "method": "GET",
+  "url": "https://workers.example.com/support/self-hosted-tier1/health",
+  "expected_status": 200
+}
