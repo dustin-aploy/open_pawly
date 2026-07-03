@@ -43,21 +43,35 @@ Skill protection note:
 
 ## Install
 
+From PyPI (after release):
+
 ```bash
 pip install pawly
 ```
 
-`pawly` depends on [`pawprint`](https://github.com/dustin-aploy/pawprint), which is installed automatically. Or from a local checkout of this repository:
+This pulls in `pawly-pawprint` automatically. Do **not** run `pip install pawprint` — that PyPI name belongs to an unrelated package.
+
+From GitHub:
 
 ```bash
-pip install -e .
+pip install "git+https://github.com/dustin-aploy/pawprint.git"
+pip install "git+https://github.com/dustin-aploy/open_pawly.git" --no-deps
 ```
+
+From a local checkout of this repository (with sibling `pawprint` checkout):
+
+```bash
+pip install -e ../pawprint
+pip install --no-build-isolation --no-deps -e .
+```
+
+Or use `scripts/bootstrap.sh`, which installs sibling `pawprint` when present.
 
 `pawly-cloud` is optional. `examples/basic_usage.py` runs without it and skips cloud-specific output when the package is not installed.
 
 ## Quick Start
 
-1. Install `pawly` (it pulls in `pawprint`):
+1. Install `pawly` (PyPI) or follow the GitHub/local steps in [Install](#install):
 
 ```bash
 pip install pawly

@@ -22,7 +22,7 @@ VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 DIST_INFO = f"{DIST_NAME}-{VERSION}.dist-info"
 WHEEL_NAME = f"{DIST_NAME}-{VERSION}-py3-none-any.whl"
 ENTRY_POINTS = "[console_scripts]\npawly = pawly.cli:main\n"
-REQUIRES_DIST = ["pawprint"]
+REQUIRES_DIST = ["pawly-pawprint>=0.1.0"]
 
 
 def _metadata_text() -> str:

@@ -23,7 +23,7 @@ It checks a small set of things:
 From a checkout of [open_pawly](https://github.com/dustin-aploy/open_pawly):
 
 ```bash
-pip install -e ../pawprint   # sibling checkout, or: pip install pawprint
+pip install -e ../pawprint   # sibling checkout, or: pip install pawly-pawprint
 pip install -e .
 pip install -e ./test-suite
 ```
