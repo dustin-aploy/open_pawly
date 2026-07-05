@@ -4,10 +4,18 @@ from pathlib import Path
 
 from pawly import (
     ClaudeSkillsPawAdapter,
+    CrewAIPawAdapter,
+    LangGraphPawAdapter,
+    OpenClawPawAdapter,
     OpenAIAgentsPawAdapter,
     PawlyRuntime,
+    SelfHostedHTTPAdapter,
+    SelfHostedWorkerConfig,
     wrap_claude_skill_executor,
     wrap_claude_skills,
+    wrap_crewai_task_executor,
+    wrap_langgraph_transition_executor,
+    wrap_openclaw_tool_executor,
     wrap_openai_tool_executor,
     wrap_openai_tools,
 )
@@ -173,6 +181,125 @@ class PublicAdapterTests(unittest.TestCase):
 
         self.assertEqual(result["type"], "allow")
         self.assertEqual(result["execution"]["result"]["skill_name"], "draft helpful reply")
+
+    def test_crewai_adapter_accepts_plain_dict(self):
+        adapter = CrewAIPawAdapter(self.runtime)
+        seen = []
+        result = adapter.execute_native_task(
+            {
+                "task": "Answer order status questions for a customer",
+                "action": "draft helpful reply",
+                "confidence": 0.88,
+                "payload": {"channel": "email"},
+            },
+            lambda updated: seen.append(updated) or {"action": updated.action, "payload": updated.payload},
+        )
+        self.assertEqual(result["type"], "allow")
+        self.assertEqual(seen[0].action, "draft helpful reply")
+
+    def test_langgraph_adapter_accepts_object(self):
+        @dataclass
+        class NativeTransition:
+            from_node: str
+            to_node: str
+            task: str
+            confidence: float
+            metadata: dict
+
+        adapter = LangGraphPawAdapter(self.runtime)
+        seen = []
+        result = adapter.execute_native_transition(
+            NativeTransition(
+                from_node="classify",
+                to_node="reply",
+                task="Answer order status questions for a customer",
+                confidence=0.9,
+                metadata={"channel": "chat"},
+            ),
+            lambda updated: seen.append(updated) or {"to_node": updated.to_node, "metadata": updated.metadata},
+        )
+        self.assertEqual(result["type"], "allow")
+        self.assertEqual(seen[0].to_node, "reply")
+
+    def test_openclaw_adapter_accepts_plain_dict(self):
+        adapter = OpenClawPawAdapter(self.runtime)
+        seen = []
+        result = adapter.execute_native_tool(
+            {
+                "task": "Answer order status questions for a customer",
+                "action": "draft helpful reply",
+                "confidence": 0.87,
+                "metadata": {"channel": "chat"},
+            },
+            lambda updated: seen.append(updated) or {"action": updated.action, "metadata": updated.metadata},
+        )
+        self.assertEqual(result["type"], "allow")
+        self.assertEqual(seen[0].action, "draft helpful reply")
+
+    def test_http_self_hosted_adapter_builds_requests(self):
+        adapter = SelfHostedHTTPAdapter(
+            SelfHostedWorkerConfig(
+                invoke_url="https://worker.example/invoke",
+                healthcheck_url="https://worker.example/health",
+                auth_token="secret-token",
+            )
+        )
+        invoke = adapter.build_native_invoke_request(
+            {
+                "task": "Answer order status questions for a customer",
+                "action": "draft helpful reply",
+                "confidence": 0.9,
+                "metadata": {"channel": "email"},
+            }
+        )
+        self.assertEqual(invoke["url"], "https://worker.example/invoke")
+        self.assertEqual(invoke["headers"]["Authorization"], "Bearer secret-token")
+        health = adapter.build_healthcheck_request()
+        self.assertEqual(health["url"], "https://worker.example/health")
+
+    def test_framework_wrappers_hide_new_adapter_calls(self):
+        crew_wrapped = wrap_crewai_task_executor(
+            self.runtime,
+            lambda updated: {"action": updated.action, "payload": updated.payload},
+        )
+        crew_result = crew_wrapped(
+            {
+                "task": "Answer order status questions for a customer",
+                "action": "draft helpful reply",
+                "confidence": 0.9,
+                "payload": {"channel": "email"},
+            }
+        )
+        self.assertEqual(crew_result["type"], "allow")
+
+        langgraph_wrapped = wrap_langgraph_transition_executor(
+            self.runtime,
+            lambda updated: {"transition": f"{updated.from_node}->{updated.to_node}"},
+        )
+        langgraph_result = langgraph_wrapped(
+            {
+                "from_node": "classify",
+                "to_node": "reply",
+                "task": "Answer order status questions for a customer",
+                "confidence": 0.9,
+                "metadata": {"channel": "chat"},
+            }
+        )
+        self.assertEqual(langgraph_result["type"], "allow")
+
+        openclaw_wrapped = wrap_openclaw_tool_executor(
+            self.runtime,
+            lambda updated: {"action": updated.action},
+        )
+        openclaw_result = openclaw_wrapped(
+            {
+                "task": "Answer order status questions for a customer",
+                "action": "draft helpful reply",
+                "confidence": 0.9,
+                "metadata": {"channel": "chat"},
+            }
+        )
+        self.assertEqual(openclaw_result["type"], "allow")
 
 
 if __name__ == "__main__":

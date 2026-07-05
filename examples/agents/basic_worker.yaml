@@ -2,8 +2,6 @@ metadata:
   id: support-triage-worker
   name: Support Triage Worker
   description: Reviews inbound support requests and routes actions through explicit Pawprint boundaries.
-  # Pawly uploads action records to Pawly Cloud automatically after local registration.
-  # Authentication is read from `~/.pawly/pawly_auth.yaml`; worker YAML does not store credentials or project settings.
 
 capabilities:
   - name: safe_reply
@@ -29,6 +27,7 @@ boundaries:
     - publish_post
   review:
     - send_external_message
+    - summarize customer issues
   block:
     - issue_refund
     - give legal advice

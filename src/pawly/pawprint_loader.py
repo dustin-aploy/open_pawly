@@ -176,19 +176,23 @@ def parse_pawprint_document(raw_document: dict[str, Any]) -> PawprintConfig:
     skill = _mapping(raw_document.get("skill"))
     capabilities = raw_document.get("capabilities", [])
     skill_metadata = _parse_skill_metadata(metadata, skill)
+    resolved_id = str(raw_document.get("id") or metadata.get("id") or "").strip()
+    resolved_name = str(raw_document.get("name") or metadata.get("name") or "").strip()
+    resolved_description = str(
+        raw_document.get("summary")
+        or raw_document.get("description")
+        or metadata.get("description")
+        or ""
+    ).strip()
 
     return PawprintConfig(
-        id=str(metadata["id"]),
-        name=str(metadata["name"]),
-        description=str(metadata["description"]),
-        capabilities=[
-            str(item.get("name", "")).strip()
-            for item in capabilities
-            if isinstance(item, dict) and str(item.get("name", "")).strip()
-        ],
-        allowed_actions=_string_list(boundaries.get("allow", [])),
-        review_actions=_string_list(boundaries.get("review", [])),
-        blocked_actions=_string_list(boundaries.get("block", [])),
+        id=resolved_id,
+        name=resolved_name,
+        description=resolved_description,
+        capabilities=_capability_names(capabilities),
+        allowed_actions=_string_list(boundaries.get("auto", boundaries.get("allow", []))),
+        review_actions=_string_list(boundaries.get("ask_first", boundaries.get("review", []))),
+        blocked_actions=_string_list(boundaries.get("never", boundaries.get("block", []))),
         protection=_parse_protection_config(protection),
         skill_metadata=skill_metadata,
         model_visible_skill_context={} if skill_metadata is None else dict(skill_metadata.model_visible_context),
@@ -216,6 +220,20 @@ def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _capability_names(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    names: list[str] = []
+    for item in value:
+        if isinstance(item, str) and item.strip():
+            names.append(item.strip())
+        elif isinstance(item, dict):
+            name = str(item.get("name", "")).strip()
+            if name:
+                names.append(name)
+    return names
 
 
 def _parse_skill_metadata(metadata: dict[str, Any], skill: dict[str, Any]) -> SkillMetadata | None:

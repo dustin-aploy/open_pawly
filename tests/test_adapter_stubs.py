@@ -1,21 +1,15 @@
-import importlib.util
 import sys
 import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SRC_ROOT = REPO_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
 from pawly.types import IntentAction, IntentSource, TaskRequest
-
-
-def _load_adapter_module(path: Path, module_name: str):
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Unable to load module from {path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module
+from pawly.adapters.langgraph import GraphTransition, LangGraphPawAdapter
+from pawly.adapters.openai_agents import OpenAIAgentAction, OpenAIAgentsPawAdapter
 
 
 class StubGateway:
@@ -47,14 +41,10 @@ class StubGateway:
 
 class AdapterStubTests(unittest.TestCase):
     def test_openai_adapter_uses_shared_gateway_flow(self):
-        module = _load_adapter_module(
-            REPO_ROOT / "adapters" / "openai-agents" / "adapter_stub.py",
-            "openai_agents_adapter_stub",
-        )
         audit_events: list[dict] = []
         gateway = StubGateway()
-        adapter = module.OpenAIAgentsPawAdapter(runtime=None, audit_hook=audit_events.append, gateway=gateway)
-        action = module.OpenAIAgentAction(
+        adapter = OpenAIAgentsPawAdapter(runtime=None, audit_hook=audit_events.append, gateway=gateway)
+        action = OpenAIAgentAction(
             task="answer order status",
             tool_name="draft helpful reply",
             confidence=0.92,
@@ -72,14 +62,10 @@ class AdapterStubTests(unittest.TestCase):
         self.assertTrue(audit_events[0]["executed"])
 
     def test_langgraph_adapter_preserves_transition_mapping(self):
-        module = _load_adapter_module(
-            REPO_ROOT / "adapters" / "langgraph" / "adapter_stub.py",
-            "langgraph_adapter_stub",
-        )
         audit_events: list[dict] = []
         gateway = StubGateway()
-        adapter = module.LangGraphPawAdapter(runtime=None, audit_hook=audit_events.append, gateway=gateway)
-        transition = module.GraphTransition(
+        adapter = LangGraphPawAdapter(runtime=None, audit_hook=audit_events.append, gateway=gateway)
+        transition = GraphTransition(
             from_node="draft",
             to_node="publish",
             task="publish update",
