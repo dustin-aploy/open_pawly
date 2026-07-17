@@ -1,5 +1,9 @@
 # Pawly (OSS)
 
+<p align="center">
+  <img src="docs/assets/icon.png" alt="Pawly icon" width="128">
+</p>
+
 `pawly` is the open-source local decision engine published from this `open_pawly` project.
 Throughout this project, `pawly` means the OSS package; the full product (OSS plus the cloud
 version) is the Pawly platform, and cloud-only behavior lives in `pawly-cloud`.
@@ -19,8 +23,11 @@ Contents:
 
 Public runtime surface:
 
-- `decide(...)`
+- `Pawly(...).achieve(...)`
+- `achieve(...)`
 - `run(...)`
+- `run_actions(...)`
+- `decide(...)`
 - `DecisionEngine.register_skills(...)`
 - `DecisionEngine.run_actions(...)`
 - `wrap_*` helpers for existing tool or skill executors
@@ -107,33 +114,33 @@ boundaries:
 python -m pawprint.validate ./worker.yaml
 ```
 
-4. Register skills and let Pawly decide + execute in one call:
+4. Register skills and delegate a goal:
 
 ```python
-from pawly import Action, DecisionEngine, HeuristicPolicy, SkillRegistry
+from pawly import HeuristicPolicy, Pawly, SkillRegistry
 
-runtime = DecisionEngine(
+pawly = Pawly(
     "./worker.yaml",
     scoring_policy=HeuristicPolicy(),
 )
 
 skills = SkillRegistry()
-skills.register("safe_reply", lambda args, context: {"kind": "reply", "args": args, "context": context})
-skills.register("publish_post", lambda args, context: {"kind": "publish", "args": args, "context": context})
-runtime.register_skills(skills)
+skills.register("safe_reply", lambda args, context: {
+    "kind": "reply",
+    "objective": args["objective"],
+    "order_id": context.get("order_id"),
+})
+pawly.register_skills(skills)
 
-result = runtime.run_actions(
-    state={"preferred_targets": ["helpdesk"]},
-    actions=[
-        Action(name="safe_reply", arguments={}, target="helpdesk"),
-        Action(name="publish_post", arguments={"draft_id": "post-42"}),
-    ],
-    context={"channel": "chat"},
+result = pawly.achieve(
+    objective="safe reply to the duplicate charge question",
+    context={"order_id": "123", "channel": "chat"},
+    constraints={"max_cost": 2},
 )
 
-print(result["status"])
-print(result["decision"]["selected_action"])
-print(result["result"])
+print(result.status)
+print(result.result)
+print(result.action_receipt)
 ```
 
 `pawly` applies hard Pawprint boundaries first:
@@ -144,7 +151,7 @@ print(result["result"])
 
 If you set the runtime `scoring_policy` to `cloud`, Pawly sends `allow` and `review` candidates to the configured cloud policy. Cloud may still recommend review, but runtime outputs remain aligned to Pawprint boundaries: `allow`, `review`, and `block`.
 
-Manual `decide(...)` and `decide_actions(...)` flows are still available for advanced integrations, but `register_skills(...)` + `run_actions(...)` is now the recommended default path.
+`pawly.achieve(...)` is the recommended public interface for Agent Runtime integrations. It accepts an objective, context, and optional constraints, then returns a result plus an Action Receipt. Manual `run_actions(...)`, `decide(...)`, and `decide_actions(...)` flows remain available for advanced integrations and framework adapters.
 
 ## Example 1: Local Heuristic Decision
 

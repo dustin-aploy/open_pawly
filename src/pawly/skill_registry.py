@@ -23,9 +23,11 @@ class SkillRegistry:
             raise ValueError("action_name must not be empty")
         self._handlers[normalized] = handler
 
+    def action_names(self) -> list[str]:
+        return sorted(self._handlers)
+
     def execute(self, action: Action, context: dict[str, Any] | None = None) -> Any:
         handler = self._handlers.get(action.name)
         if handler is None:
             raise KeyError(f"no skill registered for action: {action.name}")
         return handler(dict(action.arguments), dict(context or {}))
-

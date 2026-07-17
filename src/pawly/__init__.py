@@ -25,7 +25,7 @@ from .adapters import (
     wrap_openai_tool_executor,
     wrap_openai_tools,
 )
-from .api import decide, run, run_actions
+from .api import achieve, decide, run, run_actions
 from .approval import (
     ApprovalHandler,
     ApprovalRecord,
@@ -63,6 +63,7 @@ from .backends import (
 )
 from .decision_engine import ActionCandidate, ActionDecision, DecisionEngine
 from .gateway import ExecutionGateway, GatewayProtocol, wrap_execute_fn, wrap_executor, wrap_framework_adapter
+from .goal import GoalExecutionResult, Pawly
 from .loader.yaml_loader import load_yaml_file
 from .pawprint_loader import (
     PROTECTED_SKILL_WARNING,
@@ -111,6 +112,7 @@ __all__ = [
     "DecisionState",
     "ExecutionGateway",
     "GatewayProtocol",
+    "GoalExecutionResult",
     "GraphTransition",
     "FileApprovalQueue",
     "InMemoryApprovalQueue",
@@ -132,6 +134,7 @@ __all__ = [
     "Policy",
     "PolicyScore",
     "PawlyRuntime",
+    "Pawly",
     "ProtectedAuditRedactingSink",
     "ReviewerPolicy",
     "ReviewerBackend",
@@ -153,6 +156,7 @@ __all__ = [
     "PROTECTED_SKILL_WARNING",
     "build_model_visible_skill_context",
     "build_default_audit_sink",
+    "achieve",
     "decide",
     "load_yaml_file",
     "evaluate_pawprint",

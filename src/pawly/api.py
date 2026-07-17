@@ -8,6 +8,7 @@ from pawly.action_selection import ActionDecision
 from pawly.contracts import Action
 from pawly.pawprint_loader import PawprintConfig
 from pawly.runtime import DecisionEngine
+from pawly.goal import GoalExecutionResult, Pawly
 from pawly.skill_registry import SkillRegistry
 
 
@@ -54,4 +55,20 @@ def run_actions(
         actions=actions,
         context=context,
         pawprint_config=pawprint_config,
+    )
+
+
+def achieve(
+    pawprint: str | Path,
+    *,
+    objective: str,
+    context: Mapping[str, Any] | None = None,
+    constraints: Mapping[str, Any] | None = None,
+    skill_registry: SkillRegistry | None = None,
+    **engine_kwargs: Any,
+) -> GoalExecutionResult:
+    return Pawly(str(pawprint), skill_registry=skill_registry, **engine_kwargs).achieve(
+        objective=objective,
+        context=context,
+        constraints=constraints,
     )
