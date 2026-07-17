@@ -1,33 +1,63 @@
-# Pawly OSS
+# Pawly
 
 <p align="center">
   <img src="docs/assets/icon.png" alt="Pawly icon" width="128">
 </p>
 
-Pawly OSS is the local runtime for safely completing delegated agent goals.
+<p align="center">
+  <strong>Local execution boundaries for agent actions.</strong>
+</p>
 
-Use it when your agent already knows what it wants to accomplish, but you need a
-clear boundary for what it may execute, which local skill should run, and what
-receipt should be recorded after the attempt.
+Pawly is a lightweight Python runtime for putting a policy boundary in front of
+agent tools, skills, and side effects. It lets an agent delegate a goal, resolves
+that goal to a registered local capability, checks the Pawprint policy boundary,
+executes the selected capability, and returns an auditable receipt.
 
-The main interface is:
+Pawly is not an agent framework. It is the layer between an agent runtime and the
+actions that runtime wants to perform.
 
 ```python
-pawly.achieve(objective=..., context=..., constraints=...)
+from pawly import Pawly
+
+# Register skills before executing a goal. See Quickstart for a complete example.
+pawly = Pawly("./worker.yaml")
+result = pawly.achieve(
+    objective="safe reply to the duplicate charge question",
+    context={"order_id": "123"},
+    constraints={"max_cost": 2},
+)
 ```
 
-Pawly OSS runs locally and does not require `pawly-cloud`. Cloud-only planning,
-credential brokering, hosted approvals, and marketplace governance live outside
-this repository.
+## Status
 
-## What You Get
+Pawly is in alpha. The goal interface, Pawprint boundary model, and local
+execution receipts are the primary stable surfaces. Lower-level adapter and
+gateway APIs may continue to evolve.
 
-- Goal delegation through `Pawly(...).achieve(...)`
-- Local Pawprint policy boundaries: `allow`, `review`, and `block`
-- Local skill registration and execution
-- Deterministic goal-to-skill matching
-- Action receipts with an execution envelope
-- Offline tests, examples, and adapter utilities
+## Why Pawly
+
+Agents are increasingly good at deciding what should happen next. Production
+systems still need a smaller, explicit boundary around what is allowed to
+happen.
+
+Pawly focuses on that boundary:
+
+- declare allowed, review-only, and blocked capabilities in Pawprint
+- register local skills without changing your agent framework
+- run deterministic OSS policy checks offline
+- produce action receipts for debugging and audit
+- integrate at existing tool-execution points through adapters
+
+## Core Concepts
+
+| Concept | Meaning |
+| --- | --- |
+| Pawprint | The YAML contract that declares metadata, capabilities, and boundaries. |
+| Capability | A named action the agent may ask Pawly to use. |
+| Skill | Local Python code registered to implement a capability. |
+| Objective | The goal delegated by the agent runtime. |
+| Execution envelope | The scoped runtime boundary for a goal: resources, capabilities, limits, and approvals. |
+| Action receipt | The auditable result of a goal attempt. |
 
 ## Install
 
@@ -44,25 +74,27 @@ pip install "git+https://github.com/dustin-aploy/pawprint.git"
 pip install "git+https://github.com/dustin-aploy/open_pawly.git" --no-deps
 ```
 
-From a local checkout with sibling `pawprint`:
+From source:
 
 ```bash
+git clone git@github.com:dustin-aploy/open_pawly.git
+cd open_pawly
 pip install -e ../pawprint
-pip install --no-build-isolation --no-deps -e .
+pip install --no-build-isolation --no-deps -e ".[dev]"
 ```
 
-`pawly` depends on `pawly-pawprint`. Do not install the unrelated PyPI package
-named `pawprint`.
+The PyPI package dependency is `pawly-pawprint`. Do not install the unrelated
+package named `pawprint`.
 
-## Quick Start
+## Quickstart
 
-1. Create a Pawprint file, for example `worker.yaml`:
+Create `worker.yaml`:
 
 ```yaml
 metadata:
-  id: support-triage-worker
-  name: Support Triage Worker
-  description: Handles safe support actions.
+  id: support-worker
+  name: Support Worker
+  description: Local support action boundary.
 
 capabilities:
   - name: safe_reply
@@ -78,13 +110,13 @@ boundaries:
     - issue_refund
 ```
 
-2. Validate it:
+Validate it:
 
 ```bash
 python -m pawprint.validate ./worker.yaml
 ```
 
-3. Register a local skill and delegate a goal:
+Register a skill and delegate a goal:
 
 ```python
 from pawly import HeuristicPolicy, Pawly, SkillRegistry
@@ -95,7 +127,7 @@ skills = SkillRegistry()
 skills.register(
     "safe_reply",
     lambda args, context: {
-        "reply": "We checked your order and will follow up safely.",
+        "message": "We checked your order and will follow up safely.",
         "objective": args["objective"],
         "order_id": context.get("order_id"),
     },
@@ -110,28 +142,38 @@ result = pawly.achieve(
 
 print(result.status)
 print(result.result)
-print(result.action_receipt)
+print(result.action_receipt["execution_envelope"])
 ```
 
-Expected outcome:
+## Public API
 
-- Pawly matches the goal to the registered `safe_reply` capability.
-- `issue_refund` is blocked by the Pawprint boundary.
-- The result includes an action receipt with the selected capability and an
-  execution envelope.
+The recommended integration surface is goal-oriented:
 
-## Action Receipt
+```python
+Pawly(...).achieve(objective=..., context=..., constraints=...)
+```
 
-`achieve(...)` returns a `GoalExecutionResult`. The receipt is available at
-`result.action_receipt` and includes:
+Lower-level APIs are available for adapters and migration work:
+
+| API | Use when |
+| --- | --- |
+| `achieve(...)` | You want the top-level helper around `Pawly(...).achieve(...)`. |
+| `DecisionEngine.run_actions(...)` | You already have explicit `Action` objects. |
+| `run_actions(...)` | You want the top-level explicit-action helper. |
+| `decide(...)` | You only need decision output, not execution. |
+| `run(...)` | You need the legacy task/action evaluation helper. |
+| `wrap_*` adapters | You are inserting Pawly into an existing tool executor. |
+
+## Receipts
+
+`achieve(...)` returns `GoalExecutionResult`.
 
 ```python
 {
-    "interface": "pawly.achieve",
+    "status": "completed",
     "objective": "safe reply to the duplicate charge question",
     "selected_capability": "safe_reply",
     "execution_envelope": {
-        "objective": "safe reply to the duplicate charge question",
         "resource_scope": {"order_id": "123", "channel": "chat"},
         "allowed_capabilities": ["safe_reply"],
         "financial_limits": {"max_cost": 2},
@@ -141,77 +183,97 @@ Expected outcome:
 }
 ```
 
-The execution envelope is the local runtime boundary for a delegated goal. It
-captures the goal, resource scope, allowed capabilities, cost limits, execution
-limits, and approval policy that applied to the attempt.
+Common statuses:
 
-## Common Results
+| Status | Meaning |
+| --- | --- |
+| `completed` | A matching local skill ran successfully. |
+| `unsupported_goal` | No registered skill matched the delegated objective. |
+| `accepted` | Cloud-style project input was accepted without local execution. |
+| `failed` | Local execution failed or was blocked. |
 
-- `completed`: a matching local skill ran successfully.
-- `unsupported_goal`: no registered skill matched the objective.
-- `accepted`: cloud-style constructor input was accepted for handoff, but no
-  local Pawprint was provided.
-- `failed`: the selected local skill failed or the runtime blocked execution.
+## Architecture
 
-## Cloud-Style Project Setup
+Pawly keeps the core runtime small:
 
-Developer platform projects can initialize Pawly with a project API key:
-
-```python
-from pawly import Pawly
-
-pawly = Pawly(api_key="PAWLY_API_KEY", project_id="PAWLY_PROJECT_ID")
-result = pawly.achieve(
-    objective="resolve a customer issue safely",
-    context={"source": "first_connection"},
-    constraints={"max_cost": 2},
-)
+```text
+Agent runtime
+    |
+    | objective + context + constraints
+    v
+Pawly
+    |-- Pawprint boundary
+    |-- Skill registry
+    |-- Policy engine
+    |-- Execution gateway
+    v
+Local skill executor
 ```
 
-In OSS this returns an accepted receipt without performing hosted cloud planning.
-Use the hosted Pawly platform for dynamic multi-skill planning, credential
-brokering, human approval flows, and full cloud governance.
+The package intentionally has no dependency on `pawly-cloud`. Hosted planning,
+credential brokering, marketplace access, and organization governance are cloud
+features, not OSS runtime requirements.
 
-## Advanced APIs
+## Adapters
 
-Most new integrations should start with `Pawly(...).achieve(...)`.
+Pawly can be inserted at the point where an existing framework is about to run a
+tool, transition, or skill:
 
-These lower-level APIs still exist for framework adapters, tests, and migration
-work:
+- OpenAI Agents
+- Claude Skills
+- LangGraph
+- CrewAI
+- OpenClaw-style loops
+- self-hosted HTTP workers
 
-- `achieve(...)`: top-level helper around `Pawly(...).achieve(...)`
-- `DecisionEngine.run_actions(...)`: execute explicit `Action` objects
-- `run_actions(...)`: top-level helper for explicit actions
-- `decide(...)`: decision-only action selection
-- `run(...)`: legacy task/action evaluation helper
-- `wrap_openai_tool_executor(...)`, `wrap_claude_skill_executor(...)`, and other
-  adapter wrappers for existing framework executors
+See [`src/pawly/adapters/README.md`](src/pawly/adapters/README.md) and
+[`adapters/`](adapters/).
 
-If you are building a new agent integration, treat these as advanced escape
-hatches rather than the first path.
+## Documentation
+
+- [Architecture](docs/architecture.md)
+- [Execution gateway](docs/execution_gateway.md)
+- [Run actions](docs/run_actions.md)
+- [Approval flow](docs/approval_flow.md)
+- [Audit and replay](docs/audit_and_replay.md)
+- [Pawprint policy engine](docs/pawprint_policy_engine.md)
+- [Protected skills](docs/protected_skills.md)
+- [OSS vs Cloud](docs/oss_vs_cloud.md)
+- [Project status](docs/status.md)
+
+## Development
+
+```bash
+pip install -e ../pawprint
+pip install --no-build-isolation --no-deps -e ".[dev]"
+python -m pytest
+```
+
+Focused smoke tests:
+
+```bash
+python -m pytest tests/test_goal_interface.py tests/test_run_actions.py tests/test_runtime_smoke.py
+```
+
+## Contributing
+
+Issues and pull requests are welcome. For code changes, include focused tests and
+keep cloud-only behavior out of the OSS runtime. If a change affects the
+Pawprint contract, update the sibling `pawprint` package and relevant docs in
+the same patch.
 
 ## Repository Layout
 
-- `src/pawly/`: core runtime package
-- `examples/`: runnable local examples
-- `docs/`: architecture and runtime notes
-- `tests/`: package tests
-- `test-suite/`: local conformance suite
-- `adapters/`: adapter docs and stubs
-- `scripts/`: bootstrap and smoke-test helpers
+```text
+src/pawly/       core runtime package
+examples/        runnable examples
+docs/            architecture and runtime notes
+tests/           package tests
+test-suite/      local conformance suite
+adapters/        adapter docs and stubs
+scripts/         bootstrap and smoke-test helpers
+```
 
-## OSS vs Cloud
+## License
 
-Pawly OSS provides a local, deterministic execution boundary. It is useful for
-development, local policy checks, and self-hosted agent runtimes.
-
-The hosted Pawly platform adds the cloud-only product capabilities:
-
-- dynamic multi-skill planning
-- credential-scoped execution
-- hosted human approval
-- organization governance
-- audit export
-- marketplace skill access and settlement
-
-Pawly OSS stays independent from `pawly-cloud`.
+Apache-2.0. See [LICENSE](LICENSE).
