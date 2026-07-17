@@ -5,15 +5,20 @@
 </p>
 
 <p align="center">
-  <strong>Managed execution for AI agent actions.</strong>
+  <strong>Managed, safe execution for AI agent actions.</strong>
 </p>
 
 Pawly takes over the messy part of agent execution: deciding which capability
 should run, checking whether it is allowed, wrapping the call in a policy-aware
-execution path, and returning a receipt you can debug or audit later.
+execution path, and returning a receipt you can debug or audit later. It is built
+for the moment an agent is about to touch the outside world: send an email,
+publish content, issue a refund, update a record, call an API, or trigger a
+payment.
 
 Instead of wiring every tool call, permission rule, fallback, and audit record by
-hand, your agent delegates a goal to Pawly:
+hand, your agent delegates a goal to Pawly. Pawly manages the execution path so
+your agent can act without quietly doing something unsafe, unauthorized, or
+impossible to reconstruct later.
 
 ```python
 from pawly import Pawly
@@ -27,9 +32,9 @@ result = pawly.achieve(
 )
 ```
 
-Pawly is not another agent framework. It is the execution layer you put behind
-one: your agent decides what it wants, Pawly manages how that action is allowed
-to run.
+Pawly is not another agent framework. It is the safety and execution layer you
+put behind one: your agent decides what it wants, Pawly manages how that action
+is allowed to run.
 
 ## Status
 
@@ -39,16 +44,20 @@ gateway APIs may continue to evolve.
 
 ## Why Pawly
 
-Building agent products gets painful right after the demo works. You start with
-tool calls, then quickly need routing, permission checks, blocked actions,
-review paths, audit logs, reproducible receipts, and framework adapters.
+Building agent products gets painful and risky right after the demo works. You
+start with tool calls, then quickly need routing, permission checks, blocked
+actions, review paths, audit logs, reproducible receipts, and framework adapters.
+The hardest bugs are not syntax errors; they are agents calling the wrong tool,
+acting outside their scope, or leaving no useful trace when something goes wrong.
 
 Pawly packages that execution work into a small runtime:
 
 - **Stop hand-rolling tool routing.** Delegate an objective and let Pawly map it
   to a registered capability.
+- **Make external actions safer.** Put policy checks before calls that can email,
+  publish, refund, delete, pay, or modify user data.
 - **Keep permissions out of prompt glue.** Declare allowed, review-only, and
-  blocked capabilities in Pawprint.
+  blocked capabilities in Pawprint instead of relying on model instructions.
 - **Make execution inspectable.** Every goal attempt can return an action receipt
   with the selected capability and execution envelope.
 - **Keep your existing framework.** Insert Pawly before the tool or skill
