@@ -5,16 +5,16 @@
 </p>
 
 <p align="center">
-  <strong>Local execution boundaries for agent actions.</strong>
+  <strong>Let agents act, without letting them run unchecked.</strong>
 </p>
 
-Pawly is a lightweight Python runtime for putting a policy boundary in front of
-agent tools, skills, and side effects. It lets an agent delegate a goal, resolves
-that goal to a registered local capability, checks the Pawprint policy boundary,
-executes the selected capability, and returns an auditable receipt.
+Pawly is an open-source Python runtime that sits between your AI agent and the
+tools it wants to call. When an agent asks to complete a goal, Pawly resolves the
+goal to a registered local skill, checks what the agent is allowed to do, runs
+only the approved capability, and returns a receipt you can inspect later.
 
-Pawly is not an agent framework. It is the layer between an agent runtime and the
-actions that runtime wants to perform.
+Use Pawly when you want agent actions to be explicit, policy-bound, and
+auditable, without replacing your existing agent framework.
 
 ```python
 from pawly import Pawly
