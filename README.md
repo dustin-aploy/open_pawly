@@ -5,16 +5,15 @@
 </p>
 
 <p align="center">
-  <strong>Let agents act, without letting them run unchecked.</strong>
+  <strong>Managed execution for AI agent actions.</strong>
 </p>
 
-Pawly is an open-source Python runtime that sits between your AI agent and the
-tools it wants to call. When an agent asks to complete a goal, Pawly resolves the
-goal to a registered local skill, checks what the agent is allowed to do, runs
-only the approved capability, and returns a receipt you can inspect later.
+Pawly takes over the messy part of agent execution: deciding which capability
+should run, checking whether it is allowed, wrapping the call in a policy-aware
+execution path, and returning a receipt you can debug or audit later.
 
-Use Pawly when you want agent actions to be explicit, policy-bound, and
-auditable, without replacing your existing agent framework.
+Instead of wiring every tool call, permission rule, fallback, and audit record by
+hand, your agent delegates a goal to Pawly:
 
 ```python
 from pawly import Pawly
@@ -28,6 +27,10 @@ result = pawly.achieve(
 )
 ```
 
+Pawly is not another agent framework. It is the execution layer you put behind
+one: your agent decides what it wants, Pawly manages how that action is allowed
+to run.
+
 ## Status
 
 Pawly is in alpha. The goal interface, Pawprint boundary model, and local
@@ -36,17 +39,22 @@ gateway APIs may continue to evolve.
 
 ## Why Pawly
 
-Agents are increasingly good at deciding what should happen next. Production
-systems still need a smaller, explicit boundary around what is allowed to
-happen.
+Building agent products gets painful right after the demo works. You start with
+tool calls, then quickly need routing, permission checks, blocked actions,
+review paths, audit logs, reproducible receipts, and framework adapters.
 
-Pawly focuses on that boundary:
+Pawly packages that execution work into a small runtime:
 
-- declare allowed, review-only, and blocked capabilities in Pawprint
-- register local skills without changing your agent framework
-- run deterministic OSS policy checks offline
-- produce action receipts for debugging and audit
-- integrate at existing tool-execution points through adapters
+- **Stop hand-rolling tool routing.** Delegate an objective and let Pawly map it
+  to a registered capability.
+- **Keep permissions out of prompt glue.** Declare allowed, review-only, and
+  blocked capabilities in Pawprint.
+- **Make execution inspectable.** Every goal attempt can return an action receipt
+  with the selected capability and execution envelope.
+- **Keep your existing framework.** Insert Pawly before the tool or skill
+  executor instead of rebuilding your agent loop.
+- **Run locally first.** Use deterministic OSS policy checks offline, then move
+  cloud-only planning and governance to the hosted platform when needed.
 
 ## Core Concepts
 
