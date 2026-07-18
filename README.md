@@ -36,11 +36,39 @@ Pawly is not another agent framework. It is the safety and execution layer you
 put behind one: your agent decides what it wants, Pawly manages how that action
 is allowed to run.
 
+This repository contains the open-source local runtime. Pawly Cloud adds the
+hosted intelligence layer for production agents: richer goal understanding,
+dynamic multi-skill planning, credential-scoped execution, human approval flows,
+and organization governance. Start locally with the same `achieve(...)`
+interface, then move complex execution paths to Cloud when deterministic local
+matching is no longer enough.
+
 ## Status
 
 Pawly is in alpha. The goal interface, Pawprint boundary model, and local
 execution receipts are the primary stable surfaces. Lower-level adapter and
 gateway APIs may continue to evolve.
+
+## OSS and Cloud
+
+Pawly OSS is the local execution boundary: it reads Pawprint, matches a goal to
+registered local capabilities, runs deterministic policy checks, and records a
+receipt.
+
+Pawly Cloud is the managed execution platform: it can use hosted intelligence to
+interpret broader objectives, plan across multiple skills, manage credential
+scope, request human approval, enforce organization policy, and keep audit trails
+without making every agent team build that infrastructure themselves.
+
+The split is intentional:
+
+| Layer | Best for |
+| --- | --- |
+| Pawly OSS | Local development, self-hosted execution, deterministic policy checks, adapter integration. |
+| Pawly Cloud | Production agents that need smarter goal resolution, managed credentials, approvals, governance, and marketplace skills. |
+
+Both layers use the same goal-oriented mental model: your agent delegates an
+objective, Pawly manages the execution path.
 
 ## Why Pawly
 
