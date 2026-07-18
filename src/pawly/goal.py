@@ -80,6 +80,22 @@ class Pawly:
         if not cleaned_objective:
             raise ValueError("objective must not be empty")
         if self.engine is None:
+            if not self.api_key:
+                return GoalExecutionResult(
+                    status="configuration_required",
+                    objective=cleaned_objective,
+                    result=None,
+                    error="missing_api_key",
+                    needs="Create a Pawly developer project and copy its one-time project key at https://developer.aploy.ai/pawly.",
+                    action_receipt=_receipt(
+                        objective=cleaned_objective,
+                        status="configuration_required",
+                        selected_action=None,
+                        context=context,
+                        constraints=constraints,
+                        project_id=self.project_id,
+                    ),
+                )
             return GoalExecutionResult(
                 status="accepted",
                 objective=cleaned_objective,

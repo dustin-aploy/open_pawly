@@ -82,6 +82,16 @@ class GoalInterfaceTests(unittest.TestCase):
         self.assertEqual(result.action_receipt["project_id"], "proj_123")
         self.assertEqual(result.action_receipt["execution_envelope"]["resource_scope"], {"source": "first_connection"})
 
+    def test_hosted_goal_without_api_key_points_to_developer_console(self) -> None:
+        pawly = Pawly(project_id="proj_123")
+
+        result = pawly.achieve(objective="Resolve a customer issue safely")
+
+        self.assertEqual(result.status, "configuration_required")
+        self.assertEqual(result.error, "missing_api_key")
+        self.assertIn("https://developer.aploy.ai/pawly", result.needs or "")
+        self.assertEqual(result.action_receipt["project_id"], "proj_123")
+
 
 if __name__ == "__main__":
     unittest.main()

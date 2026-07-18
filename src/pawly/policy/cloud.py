@@ -13,6 +13,7 @@ def __getattr__(name: str):
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
             "CloudPolicy moved to the optional sibling package 'pawly-cloud'. "
-            "Install or add 'pawly-cloud' and import CloudPolicy from 'pawly_cloud'."
+            "Install or add 'pawly-cloud' and import CloudPolicy from 'pawly_cloud'. "
+            "If you need a managed project key, create one at https://developer.aploy.ai/pawly."
         ) from exc
     return getattr(module, "CloudPolicy")
