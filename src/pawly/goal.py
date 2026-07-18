@@ -38,7 +38,7 @@ class GoalExecutionResult:
 
 
 class Pawly:
-    """Goal-oriented Pawly OSS facade.
+    """Goal-oriented Open Pawly facade.
 
     OSS resolves a delegated objective to one registered local capability using
     deterministic metadata matching, then reuses the existing control layer,

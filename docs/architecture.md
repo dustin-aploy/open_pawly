@@ -1,8 +1,8 @@
-# Pawly (OSS) Architecture
+# Open Pawly Architecture
 
 In this document `pawly` means the open-source package published from `open_pawly`.
 The full product (open source plus the cloud version) is referred to as the Pawly platform.
-Cloud-only behavior lives in `pawly_cloud` and is never required for the OSS path.
+Cloud-only behavior lives in `pawly_cloud` and is never required for the Open Pawly path.
 
 ## Pipeline
 
@@ -46,7 +46,7 @@ Internal runtime schemas:
   - [runtime.py](../src/pawly/runtime.py)
 - Pawprint loading and conversion:
   - [pawprint_loader.py](../src/pawly/pawprint_loader.py)
-  - skill-protection support in OSS is parse plus a limited local guardrail (see `protected_oss.py`); it does not implement cloud-grade enforcement
+  - skill-protection support in Open Pawly is parse plus a limited local guardrail (see `protected_oss.py`); it does not implement cloud-grade enforcement
 - candidate action selection:
   - [action_selection.py](../src/pawly/action_selection.py)
 - deterministic policy engine:
@@ -75,9 +75,9 @@ Internal runtime schemas:
 - audit sink:
   - [backends/audit.py](../src/pawly/backends/audit.py)
 
-## OSS and cloud boundary
+## Open Pawly and cloud boundary
 
-The OSS runtime path is fully local:
+The Open Pawly runtime path is fully local:
 
 - `RuleReviewer`
 - `LocalRiskProvider`
@@ -86,17 +86,17 @@ The OSS runtime path is fully local:
 
 These run without network calls or hosted services.
 
-`pawly_cloud/` is a sibling package to `open_pawly/`. It is not an internal Pawly module and it is not required for OSS Pawly to run.
+`pawly_cloud/` is a sibling package to `open_pawly/`. It is not an internal Pawly module and it is not required for Open Pawly to run.
 
 Skill-protection metadata follows the same boundary:
 
-- OSS Pawly can parse `skill.protection` and `skill.license`
-- OSS Pawly only exposes a small safe model-visible skill card
-- OSS Pawly runs a limited local extraction guardrail and audit redaction for protected or vault skills
-- OSS Pawly does not guarantee anti-absorption or protected-prompt enforcement
+- Open Pawly can parse `skill.protection` and `skill.license`
+- Open Pawly only exposes a small safe model-visible skill card
+- Open Pawly runs a limited local extraction guardrail and audit redaction for protected or vault skills
+- Open Pawly does not guarantee anti-absorption or protected-prompt enforcement
 - full cloud skill-protection enforcement belongs in `pawly-cloud`
 
-Cloud behavior is intentionally optional. The OSS package exposes only stub placeholders:
+Cloud behavior is intentionally optional. The Open Pawly package exposes only stub placeholders:
 
 - `CloudReviewerStub`
 - `AdvancedRiskProviderStub`
@@ -112,7 +112,7 @@ For candidate-action ranking, the boundary is narrower:
 - `allow` candidates may be ranked by the configured scoring policy
 - `review` candidates can be scored but still require approval before execution
 - `block` candidates are removed completely
-- `HeuristicPolicy` is the default OSS policy
+- `HeuristicPolicy` is the default Open Pawly policy
 - `CustomPolicy` is a developer-provided policy implementation
 - `CloudPolicy` is the optional cloud scoring provider from the sibling `pawly_cloud` package
 - the cloud version is not a hardcoded requirement for candidate-action scoring

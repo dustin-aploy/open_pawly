@@ -1,4 +1,4 @@
-"""Action-scoring policy abstractions for Pawly OSS."""
+"""Action-scoring policy abstractions for Open Pawly."""
 
 from .base import Policy
 from .heuristic import DefaultOssPolicy, HeuristicPolicy

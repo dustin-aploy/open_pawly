@@ -49,9 +49,9 @@ Pawly is in alpha. The goal interface, Pawprint boundary model, and local
 execution receipts are the primary stable surfaces. Lower-level adapter and
 gateway APIs may continue to evolve.
 
-## OSS and Cloud
+## Open Pawly and Pawly Cloud
 
-Pawly OSS is the local execution boundary: it reads Pawprint, matches a goal to
+Open Pawly is the local execution boundary: it reads Pawprint, matches a goal to
 registered local capabilities, runs deterministic policy checks, and records a
 receipt.
 
@@ -64,7 +64,7 @@ The split is intentional:
 
 | Layer | Best for |
 | --- | --- |
-| Pawly OSS | Local development, self-hosted execution, deterministic policy checks, adapter integration. |
+| Open Pawly | Local development, self-hosted execution, deterministic policy checks, adapter integration. |
 | Pawly Cloud | Production agents that need smarter goal resolution, managed credentials, approvals, governance, and marketplace skills. |
 
 Both layers use the same goal-oriented mental model: your agent delegates an
@@ -90,7 +90,7 @@ Pawly packages that execution work into a small runtime:
   with the selected capability and execution envelope.
 - **Keep your existing framework.** Insert Pawly before the tool or skill
   executor instead of rebuilding your agent loop.
-- **Run locally first.** Use deterministic OSS policy checks offline, then move
+- **Run locally first.** Use deterministic Open Pawly policy checks offline, then move
   cloud-only planning and governance to the hosted platform when needed.
 
 ## Core Concepts
@@ -257,7 +257,7 @@ Local skill executor
 
 The package intentionally has no dependency on `pawly-cloud`. Hosted planning,
 credential brokering, marketplace access, and organization governance are cloud
-features, not OSS runtime requirements.
+features, not Open Pawly runtime requirements.
 
 ## Adapters
 
@@ -283,7 +283,7 @@ See [`src/pawly/adapters/README.md`](src/pawly/adapters/README.md) and
 - [Audit and replay](docs/audit_and_replay.md)
 - [Pawprint policy engine](docs/pawprint_policy_engine.md)
 - [Protected skills](docs/protected_skills.md)
-- [OSS vs Cloud](docs/oss_vs_cloud.md)
+- [Open Pawly vs Pawly Cloud](docs/oss_vs_cloud.md)
 - [Project status](docs/status.md)
 
 ## Development
@@ -303,7 +303,7 @@ python -m pytest tests/test_goal_interface.py tests/test_run_actions.py tests/te
 ## Contributing
 
 Issues and pull requests are welcome. For code changes, include focused tests and
-keep cloud-only behavior out of the OSS runtime. If a change affects the
+keep cloud-only behavior out of the Open Pawly runtime. If a change affects the
 Pawprint contract, update the sibling `pawprint` package and relevant docs in
 the same patch.
 

@@ -62,7 +62,7 @@ This captures edits introduced by approval or future rewrite paths.
 
 ## Logging format
 
-The OSS logging format remains structured JSONL.
+The Open Pawly logging format remains structured JSONL.
 
 Each line is a self-contained JSON object. That keeps local append simple while still making replay and diff operations deterministic.
 
@@ -88,4 +88,4 @@ Example: refund request with edited approval
    - executed action: `draft refund response`
    - diff: `name` changed, arguments may change
 
-This lets an OSS user inspect exactly what Pawly reviewed, what a human changed, and what finally executed.
+This lets an Open Pawly user inspect exactly what Pawly reviewed, what a human changed, and what finally executed.

@@ -1,4 +1,4 @@
-# Pawly (OSS) Implementation Status
+# Open Pawly Implementation Status
 
 This status reflects the current `open_pawly` package implementation.
 `pawly` here means the open-source package; cloud-side capabilities are tracked in `pawly_cloud`.
@@ -101,7 +101,7 @@ Modules:
 
 ## Remaining gaps
 
-- no hosted approval UI or webhook service in the OSS workspace
+- no hosted approval UI or webhook service in the Open Pawly workspace
 - no advanced anomaly detection module
 - no production cloud reviewer implementation
 - `budget/` and `performance/` remain runtime overlays inside the same package rather than separate outer packages

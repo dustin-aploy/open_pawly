@@ -13,7 +13,7 @@ LOGGER = logging.getLogger(__name__)
 
 PROTECTED_SKILL_WARNING = (
     "This skill declares skill-protection metadata. Open-source Pawly provides baseline protection only. "
-    "For stronger skill-protection controls and managed enforcement, upgrade at https://aploy.ai."
+    "For stronger skill-protection controls and managed enforcement, upgrade at https://developer.aploy.ai/pawly."
 )
 
 PRIVATE_SKILL_FIELDS = {

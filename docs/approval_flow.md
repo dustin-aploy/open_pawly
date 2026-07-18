@@ -4,7 +4,7 @@ In this document `pawly` means the open-source package published from `open_pawl
 
 Pawly now treats `require_approval` as a real runtime path.
 
-The OSS implementation stays lightweight:
+The Open Pawly implementation stays lightweight:
 - in-memory or file-backed queue
 - local callback approval handler
 - timeout-based expiry
@@ -51,7 +51,7 @@ Each approval record carries:
 
 ## Timeout behavior
 
-The OSS default is lightweight timeout expiry.
+The Open Pawly default is lightweight timeout expiry.
 
 If an approval is still pending when its timeout is reached:
 - the router marks the record as `expired`

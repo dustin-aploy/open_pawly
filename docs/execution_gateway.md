@@ -28,7 +28,7 @@ If the decision is:
 
 ## Main interfaces
 
-The current OSS gateway surface is:
+The current Open Pawly gateway surface is:
 
 - `wrap_executor(executor, pawprint, reviewer="rules")`
 - `wrap_execute_fn(fn, pawprint, reviewer="rules")`
@@ -43,7 +43,7 @@ The default reviewer is `rules`.
 That means:
 - deterministic Pawprint policy evaluation
 - no cloud dependency
-- no model-based review in the OSS execution path
+- no model-based review in the Open Pawly execution path
 
 ## Host runtime boundary
 

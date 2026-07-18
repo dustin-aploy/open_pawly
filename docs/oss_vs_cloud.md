@@ -1,14 +1,14 @@
-# OSS vs Cloud (OSS view)
+# Open Pawly vs Pawly Cloud (Open Pawly view)
 
-This document describes the boundary from the OSS side. `pawly` means the open-source package
+This document describes the boundary from the Open Pawly side. `pawly` means the open-source package
 published from `open_pawly`. The cloud-side responsibilities are documented in
-the Pawly Cloud documentation at https://aploy.ai.
+the Pawly Cloud documentation at https://developer.aploy.ai/pawly.
 
-`pawly` is designed so the OSS runtime path works fully offline with deterministic rule-based logic only.
+`pawly` is designed so the Open Pawly runtime path works fully offline with deterministic rule-based logic only.
 
 `pawly-cloud` is a separate sibling package, not an internal Pawly module. When present, it plugs in through the same `Policy` interface as any other scoring provider.
 
-## OSS runtime path
+## Open Pawly runtime path
 
 The default local path is:
 
@@ -20,7 +20,7 @@ The default local path is:
 6. wrapped executor
 7. `LocalAuditSink`
 
-The active OSS implementations are:
+The active Open Pawly implementations are:
 
 - reviewer backend: `pawly.backends.reviewer.RuleReviewer`
 - risk provider: `pawly.backends.risk.LocalRiskProvider`
@@ -37,7 +37,7 @@ These defaults keep the runtime self-contained:
 
 ## Cloud extension boundaries
 
-Cloud-only behavior must plug in through replaceable interfaces. The OSS package now exposes these boundaries:
+Cloud-only behavior must plug in through replaceable interfaces. The Open Pawly package now exposes these boundaries:
 
 - reviewer backend: `ReviewerBackend`
 - risk provider: `RiskProvider`
@@ -49,7 +49,7 @@ The main wrapper entrypoints preserve those boundaries too:
 - `wrap_executor(..., reviewer_backend=..., risk_provider=..., approval_backend=..., audit_sink=...)`
 - `wrap_execute_fn(..., reviewer_backend=..., risk_provider=..., approval_backend=..., audit_sink=...)`
 
-Cloud placeholders exist only as stubs in OSS:
+Cloud placeholders exist only as stubs in Open Pawly:
 
 - `CloudReviewerStub`
 - `AdvancedRiskProviderStub`
@@ -62,14 +62,14 @@ For candidate-action scoring, the main optional cloud boundary is `CloudPolicy` 
 
 Skill-protection metadata follows the same rule:
 
-- OSS Pawly can parse the `pawprint` skill-protection schema for compatibility
-- OSS Pawly only avoids exposing obvious private fields to model-visible context
-- OSS Pawly does not guarantee anti-absorption or cloud-grade skill-protection controls
+- Open Pawly can parse the `pawprint` skill-protection schema for compatibility
+- Open Pawly only avoids exposing obvious private fields to model-visible context
+- Open Pawly does not guarantee anti-absorption or cloud-grade skill-protection controls
 - full enforcement belongs in `pawly-cloud`
 
-## What OSS Pawly owns
+## What Open Pawly owns
 
-OSS Pawly keeps, with no required network calls:
+Open Pawly keeps, with no required network calls:
 
 - deterministic rule review
 - local risk scoring
@@ -77,7 +77,7 @@ OSS Pawly keeps, with no required network calls:
 - local JSONL audit output
 - wrapped execution control
 
-OSS Pawly is also allowed to connect outward through two replaceable boundaries:
+Open Pawly is also allowed to connect outward through two replaceable boundaries:
 
 - it can accept an injected cloud scoring policy (`CloudPolicy` from `pawly-cloud`)
 - it can upload audit events to a cloud audit service through an audit-sink boundary
@@ -85,9 +85,9 @@ OSS Pawly is also allowed to connect outward through two replaceable boundaries:
 
 The cloud audit service itself (storage, query APIs, multi-user review, trust workflows) and the
 full set of cloud responsibilities live in `pawly_cloud`. See
-the Pawly Cloud documentation at https://aploy.ai. The key boundary is that
+the Pawly Cloud documentation at https://developer.aploy.ai/pawly. The key boundary is that
 cloud services may consume runtime artifacts and decisions by reference, but they do not replace the
-local execution-boundary controller inside the OSS path.
+local execution-boundary controller inside the Open Pawly path.
 
 For cloud-backed action selection specifically:
 
@@ -121,7 +121,7 @@ Cloud plugins must preserve the same execution flow:
 
 That means cloud can enhance review, risk, approval, or audit storage without changing host planning logic or executor wrapping.
 
-## Standalone OSS checklist
+## Standalone Open Pawly checklist
 
 - `RuleReviewer` works without any model or network call
 - `LocalRiskProvider` computes risk locally from deterministic rules

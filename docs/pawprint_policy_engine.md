@@ -2,7 +2,7 @@
 
 In this document `pawly` means the open-source package published from `open_pawly`.
 
-The OSS Pawly path now has one deterministic Pawprint policy engine entrypoint:
+The Open Pawly path now has one deterministic Pawprint policy engine entrypoint:
 
 `evaluate_pawprint(intent, pawprint)`
 
@@ -63,7 +63,7 @@ The engine currently evaluates:
 - obvious boundary violations through deterministic text and token matching
 - low-confidence handoff trigger when confidence is present and below threshold
 
-If a cloud-assisted decision path is unavailable, the OSS path still falls back to the deterministic rule-based evaluation described here.
+If a cloud-assisted decision path is unavailable, the Open Pawly path still falls back to the deterministic rule-based evaluation described here.
 
 ## Decision Recommendation
 
@@ -92,10 +92,10 @@ The current rule-based score considers:
 - obvious external side effects
 - low confidence when present
 
-This score is advisory runtime output for the OSS path. It is not model-based review.
+This score is advisory runtime output for the Open Pawly path. It is not model-based review.
 
 ## Core Boundary
 
-This engine is the central OSS Pawly policy path.
+This engine is the central Open Pawly policy path.
 
 Modules like budget, memory, and performance may still exist around the runtime, but they are not the policy engine and should not define the core execution-boundary architecture.

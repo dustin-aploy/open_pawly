@@ -7,17 +7,17 @@ In this document `pawly` means the open-source package published from `open_pawl
 This compatibility is intentionally limited. Full, cloud-grade skill-protection enforcement lives in
 `pawly-cloud`.
 
-## What OSS Pawly does
+## What Open Pawly does
 
 - parses `skill.protection` and `skill.license` metadata when present
 - accepts `protection.level` values of `open`, `protected`, and `vault`
-- emits an OSS compatibility warning for `protected` and `vault`
+- emits an Open Pawly compatibility warning for `protected` and `vault`
 - exposes only a small model-visible skill card with safe public fields
 - remains independent from `pawly-cloud`
 
 ### Limited local guardrail
 
-OSS Pawly also runs a small deterministic, local-only guardrail around protected or vault skills. This is best
+Open Pawly also runs a small deterministic, local-only guardrail around protected or vault skills. This is best
 effort heuristic protection, not cloud-grade enforcement:
 
 - when `protection.monitor_extraction` is set on a `protected`/`vault` skill, it runs a deterministic
@@ -30,7 +30,7 @@ effort heuristic protection, not cloud-grade enforcement:
 These behaviors are pattern-based and easy to bypass. They reduce obvious leakage in the local path
 but do not replace cloud enforcement.
 
-## What OSS Pawly does not do
+## What Open Pawly does not do
 
 - does not guarantee anti-absorption
 - does not implement prompt vaulting
@@ -39,7 +39,7 @@ but do not replace cloud enforcement.
 - does not implement model-based or robust extraction monitoring beyond the local heuristic above
 - does not implement marketplace licensing enforcement
 
-OSS Pawly only avoids exposing obvious private fields to model-visible context, plus the limited local
+Open Pawly only avoids exposing obvious private fields to model-visible context, plus the limited local
 guardrail described above.
 
 Private fields filtered from model-visible skill context include:
