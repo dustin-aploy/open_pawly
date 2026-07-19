@@ -20,18 +20,6 @@ hand, your agent delegates a goal to Pawly. Pawly manages the execution path so
 your agent can act without quietly doing something unsafe, unauthorized, or
 impossible to reconstruct later.
 
-```python
-from pawly import Pawly
-
-# Register skills before executing a goal. See Quickstart for a complete example.
-pawly = Pawly("./worker.yaml")
-result = pawly.achieve(
-    objective="safe reply to the duplicate charge question",
-    context={"order_id": "123"},
-    constraints={"max_cost": 2},
-)
-```
-
 Pawly is not another agent framework. It is the safety and execution layer you
 put behind one: your agent decides what it wants, Pawly manages how that action
 is allowed to run.
@@ -205,14 +193,11 @@ If the objective matches a registered skill and the policy allows it, Pawly runs
 the skill. If the objective needs review or is blocked, the receipt tells you
 which boundary stopped it.
 
-### 4. Batch-register a skills folder
+### 4. Move skills into a folder
 
-After the first skill works, move your real tool code into a folder and import
-that folder through an adapter. Folder imports are format-specific: use
-`adapter="pawly"` for Pawly's simple Python export shape, or choose the adapter
-that matches an existing framework folder.
-
-Example folder:
+Once the local map works, move the same skill code into a folder. Folder imports
+always go through an adapter because each framework has its own export shape.
+Use `adapter="pawly"` for Pawly's simple Python shape.
 
 ```text
 skills/
@@ -228,107 +213,68 @@ def safe_reply(args, context):
 skills = {"safe_reply": safe_reply}
 ```
 
-```python
-from pawly import HeuristicPolicy, Pawly, PolicyService, SkillService
-
-pawly = Pawly(
-    "./worker.yaml",
-    skills=SkillService.from_directory("./skills", adapter="pawly"),
-    policy=PolicyService.local(routing=HeuristicPolicy()),
-)
-```
-
-### 5. Choose policy, audit, and cloud skills
-
-Open Pawly and Pawly Cloud use the same constructor shape. Your Pawprint stays
-the source of capabilities and boundaries. `PolicyService` decides how a run is
-reviewed and routed. `AuditService` decides where action records go.
-`SkillService.cloud(...)` lets your project call cloud-managed skills. The cloud
-key already identifies the project.
-
-```bash
-# Paste the one-time cloud key from the web console.
-export PAWLY_API_KEY="paste_the_project_key"
-```
-
-Local policy and local audit:
+Replace only the `skills=` line from the previous step:
 
 ```python
-from pawly import AuditService, HeuristicPolicy, Pawly, PolicyService, SkillService
-
-local = Pawly(
-    "./worker.yaml",
-    skills=SkillService.from_directory("./skills", adapter="pawly"),
-    policy=PolicyService.local(routing=HeuristicPolicy()),
-    audit=AuditService.local("./pawly-audit.jsonl"),
-)
+skills=SkillService.from_directory("./skills", adapter="pawly")
 ```
 
-Cloud audit, local policy:
+### 5. Add audit and cloud services
+
+Keep one `Pawly(...)` object and swap services as your needs grow. Your Pawprint
+stays the source of capabilities and boundaries. Add imports only when you use
+the matching service:
 
 ```python
 import os
-from pawly import AuditService, HeuristicPolicy, Pawly, PolicyService, SkillService
-
-cloud_audit = Pawly(
-    "./worker.yaml",
-    skills=SkillService.from_directory("./skills", adapter="pawly"),
-    policy=PolicyService.local(routing=HeuristicPolicy()),
-    audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY")),
-)
-
-result = cloud_audit.achieve(
-    objective="safe reply to the duplicate charge question",
-    context={"order_id": "123"},
-)
-print(result.action_receipt["audit"]["alerts"])
+from pawly import AuditService
 ```
 
-Cloud audit plus local audit file:
+Local audit writes receipts to a file:
 
 ```python
-cloud_and_file = Pawly(
-    "./worker.yaml",
-    skills=SkillService.from_directory("./skills", adapter="pawly"),
-    policy=PolicyService.local(routing=HeuristicPolicy()),
-    audit=AuditService.cloud(
-        api_key=os.getenv("PAWLY_API_KEY"),
-        local_path="./pawly-audit.jsonl",
-    ),
-)
+audit=AuditService.local("./pawly-audit.jsonl")
 ```
 
-Cloud skills from your local folder:
+Cloud audit sends receipts to the dashboard. The API key identifies the project;
+you do not need to pass a project id.
+
+```bash
+export PAWLY_API_KEY="paste_the_project_key"
+```
 
 ```python
-cloud_skills = Pawly(
-    "./worker.yaml",
-    # The adapter reads the local folder shape so Cloud can index/manage the project skills.
-    skills=SkillService.cloud(
-        api_key=os.getenv("PAWLY_API_KEY"),
-        directory="./skills",
-        adapter="pawly",
-    ),
-    policy=PolicyService.local(routing=HeuristicPolicy()),
-    audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY")),
+audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY"))
+```
+
+You can keep the local file while also syncing to Cloud:
+
+```python
+audit=AuditService.cloud(
+    api_key=os.getenv("PAWLY_API_KEY"),
+    local_path="./pawly-audit.jsonl",
 )
 ```
 
-Cloud marketplace skills can also be searched, tested, and added in the
-dashboard. The SDK does not need a manual skill-id list for that path; project
-skill selection is handled by Cloud.
-
-Cloud policy:
+Cloud skills use the same adapter rule as local folders:
 
 ```python
-cloud_policy = Pawly(
-    "./worker.yaml",
-    skills=SkillService.from_directory("./skills", adapter="pawly"),
-    policy=PolicyService.cloud(
-        api_key=os.getenv("PAWLY_API_KEY"),
-        routing=HeuristicPolicy(),
-    ),
-    audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY")),
+skills=SkillService.cloud(
+    api_key=os.getenv("PAWLY_API_KEY"),
+    directory="./skills",
+    adapter="pawly",
+)
+```
+
+Marketplace skills are selected in the dashboard, so the SDK does not need a
+manual skill-id list for that path.
+
+Cloud policy keeps the same local fallback shape:
+
+```python
+policy=PolicyService.cloud(
+    api_key=os.getenv("PAWLY_API_KEY"),
+    routing=HeuristicPolicy(),
 )
 ```
 
@@ -338,10 +284,9 @@ to decide between similarly named policy hooks. If cloud policy is unavailable
 for the current key or environment, the receipt includes a dashboard entry and
 the local development path remains usable.
 
-### 6. Import existing framework folders
+### 6. Import existing framework skills
 
-Different frameworks store tools and skills differently. Pick the adapter that
-matches the folder you are importing.
+Pick the adapter that matches the folder you are importing.
 
 OpenAI-style Python folder:
 
@@ -356,11 +301,9 @@ skills = SkillService.from_directory("./claude_skills", adapter="claude")
 ```
 
 If your framework already builds tool objects in code, register those objects
-directly instead of reading a folder:
+directly instead of reading a folder.
 
 ```python
-from pawly import AuditService, Pawly, PolicyService, SkillService
-
 openai_tools = [
     {
         "tool_name": "safe_reply",
@@ -375,19 +318,14 @@ openai_tools = [
     },
 ]
 
-pawly = Pawly(
-    "./worker.yaml",
-    skills=SkillService.from_openai_tools(openai_tools),
-    policy=PolicyService.local(),
-    audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY")),
-)
+skills=SkillService.from_openai_tools(openai_tools)
 ```
 
 Think of the constructor as three replaceable pieces behind the same Pawprint:
 
 | Piece | Local mode | Cloud mode |
 | --- | --- | --- |
-| `skills` | A `skills/` directory, local callables, a `SkillRegistry`, or existing framework tools through adapters | Read a local skills directory for cloud registration, or use marketplace/project skills managed in the dashboard |
+| `skills` | Local callables, a `SkillRegistry`, or an adapter-backed skills directory | Read an adapter-backed local skills directory for cloud registration, or use marketplace/project skills managed in the dashboard |
 | `policy` | Rule-based review plus optional local routing | Cloud policy when selected |
 | `audit` | JSONL file or custom sink | Cloud dashboard sync, optionally also local JSONL |
 
