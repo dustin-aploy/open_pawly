@@ -205,26 +205,27 @@ If your framework already creates tool objects in code, pass those directly:
 skills=SkillService.from_openai_tools(openai_tools)
 ```
 
-### 4. Optional upgrades
+### 4. Add a project API key when runs matter
 
-Keep the same `Pawly(...)` object and swap one service at a time.
-For audit snippets, add `AuditService` to the import line. For cloud snippets,
-also add `import os`.
-
-Write receipts locally:
+You can keep receipts in a local file:
 
 ```python
 audit=AuditService.local("./pawly-audit.jsonl")
 ```
 
-Sync receipts to a project timeline when you want runs searchable by the team.
-The API key identifies the project, so no project id is needed in code:
+When the agent starts touching real users or real accounts, get a free project
+API key from [Pawly Developer](https://developer.aploy.ai/pawly) and send
+receipts to a project timeline. The key identifies the project; no project id is
+needed in code.
 
 ```bash
 export PAWLY_API_KEY="paste_the_project_key"
 ```
 
 ```python
+import os
+from pawly import AuditService
+
 audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY"))
 ```
 
@@ -237,8 +238,8 @@ audit=AuditService.cloud(
 )
 ```
 
-Let the project call cloud-managed skills without shipping more tool glue. The
-same adapter rule applies to local folders:
+The same key can unlock cloud-managed skills, so you can add capability without
+shipping more tool glue:
 
 ```python
 skills=SkillService.cloud(
@@ -248,8 +249,8 @@ skills=SkillService.cloud(
 )
 ```
 
-Use managed policy when you want review behavior to stay consistent across
-environments. Local routing remains the fallback:
+It can also use managed policy for smarter routing and consistent review
+behavior. Local routing remains the fallback:
 
 ```python
 policy=PolicyService.cloud(
