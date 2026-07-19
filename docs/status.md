@@ -109,5 +109,4 @@ Modules:
 ## Current verification baseline
 
 - runtime tests: `open_pawly/tests`
-- test-suite tests: `open_pawly/test-suite/tests`
 - smoke flow: `./open_pawly/scripts/smoke_test.sh`

@@ -220,7 +220,6 @@ open_pawly/
     policy_engine/
     runtime.py
     types.py
-  test-suite/
   adapters/
   examples/
   scripts/

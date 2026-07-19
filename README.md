@@ -518,7 +518,6 @@ src/pawly/       core runtime package
 examples/        runnable examples
 docs/            architecture and runtime notes
 tests/           package tests
-test-suite/      local conformance suite
 adapters/        adapter docs and stubs
 scripts/         bootstrap and smoke-test helpers
 ```

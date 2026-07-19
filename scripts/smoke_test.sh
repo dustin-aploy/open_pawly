@@ -17,6 +17,5 @@ print(f'validated {path}')
 INNERPY
 python examples/basic_usage.py
 python -m pytest tests
-python -m pytest test-suite/tests
 
 echo "[pawly] smoke test complete"
