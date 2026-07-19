@@ -217,8 +217,8 @@ Write receipts locally:
 audit=AuditService.local("./pawly-audit.jsonl")
 ```
 
-Sync receipts to a project timeline. The API key identifies the project, so no
-project id is needed in code:
+Sync receipts to a project timeline when you want runs searchable by the team.
+The API key identifies the project, so no project id is needed in code:
 
 ```bash
 export PAWLY_API_KEY="paste_the_project_key"
@@ -237,8 +237,8 @@ audit=AuditService.cloud(
 )
 ```
 
-Let the project call cloud-managed skills while keeping the same adapter rule for
-local folders:
+Let the project call cloud-managed skills without shipping more tool glue. The
+same adapter rule applies to local folders:
 
 ```python
 skills=SkillService.cloud(
@@ -248,7 +248,8 @@ skills=SkillService.cloud(
 )
 ```
 
-Use managed policy when available, with local routing as the fallback:
+Use managed policy when you want review behavior to stay consistent across
+environments. Local routing remains the fallback:
 
 ```python
 policy=PolicyService.cloud(
@@ -258,16 +259,8 @@ policy=PolicyService.cloud(
 ```
 
 Marketplace skills are selected in the dashboard, so the SDK does not need a
-manual skill-id list for that path. If a cloud key is missing, Pawly returns a
-configuration step with a console link instead of failing with an unclear error.
-
-### Constructor shape
-
-| Piece | Local mode | Cloud mode |
-| --- | --- | --- |
-| `skills` | Local callables, a `SkillRegistry`, or an adapter-backed skills directory | Read an adapter-backed local skills directory for cloud registration, or use marketplace/project skills managed in the dashboard |
-| `policy` | Rule-based review plus optional local routing | Cloud policy when selected |
-| `audit` | JSONL file or custom sink | Cloud dashboard sync, optionally also local JSONL |
+manual skill-id list. If a cloud key is missing, Pawly returns a configuration
+step with a console link instead of failing with an unclear error.
 
 ## Public API
 
