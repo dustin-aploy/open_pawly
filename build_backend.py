@@ -9,7 +9,7 @@ from __future__ import annotations
 import base64
 import csv
 import hashlib
-from io import StringIO
+from io import BytesIO, StringIO
 import os
 from pathlib import Path
 import tarfile
@@ -28,6 +28,7 @@ REQUIRES_DIST = ["pawly-pawprint>=0.1.0"]
 
 
 def _metadata_text() -> str:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8") if (ROOT / "README.md").exists() else ""
     lines = [
         "Metadata-Version: 2.1",
         f"Name: {PROJECT_NAME}",
@@ -35,9 +36,12 @@ def _metadata_text() -> str:
         "Summary: Lightweight reference implementation of the Aploy Pawly execution-boundary controller.",
         "Requires-Python: >=3.10",
         "License: Apache-2.0",
+        "Description-Content-Type: text/markdown",
     ]
     lines.extend(f"Requires-Dist: {dependency}" for dependency in REQUIRES_DIST)
     lines.append("")
+    if readme:
+        lines.append(readme)
     return "\n".join(lines)
 
 
@@ -143,6 +147,10 @@ def build_sdist(sdist_directory: str, config_settings=None) -> str:
     prefix = f"{DIST_NAME}-{VERSION}"
     included_roots = ["src", "tests", "README.md", "LICENSE", "VERSION", "pyproject.toml", "build_backend.py"]
     with tarfile.open(sdist_path, "w:gz") as tf:
+        metadata = _metadata_text().encode("utf-8")
+        info = tarfile.TarInfo(f"{prefix}/PKG-INFO")
+        info.size = len(metadata)
+        tf.addfile(info, BytesIO(metadata))
         for item in included_roots:
             path = ROOT / item
             if path.exists():
