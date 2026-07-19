@@ -208,8 +208,9 @@ which boundary stopped it.
 ### 4. Batch-register a skills folder
 
 After the first skill works, move your real tool code into a folder and import
-that folder. The default directory loader reads Pawly's Python export shape. If
-the folder comes from another framework, choose the matching adapter explicitly.
+that folder through an adapter. Folder imports are format-specific: use
+`adapter="pawly"` for Pawly's simple Python export shape, or choose the adapter
+that matches an existing framework folder.
 
 Example folder:
 
@@ -232,7 +233,7 @@ from pawly import HeuristicPolicy, Pawly, PolicyService, SkillService
 
 pawly = Pawly(
     "./worker.yaml",
-    skills=SkillService.from_directory("./skills"),
+    skills=SkillService.from_directory("./skills", adapter="pawly"),
     policy=PolicyService.local(routing=HeuristicPolicy()),
 )
 ```
@@ -257,7 +258,7 @@ from pawly import AuditService, HeuristicPolicy, Pawly, PolicyService, SkillServ
 
 local = Pawly(
     "./worker.yaml",
-    skills=SkillService.from_directory("./skills"),
+    skills=SkillService.from_directory("./skills", adapter="pawly"),
     policy=PolicyService.local(routing=HeuristicPolicy()),
     audit=AuditService.local("./pawly-audit.jsonl"),
 )
@@ -271,7 +272,7 @@ from pawly import AuditService, HeuristicPolicy, Pawly, PolicyService, SkillServ
 
 cloud_audit = Pawly(
     "./worker.yaml",
-    skills=SkillService.from_directory("./skills"),
+    skills=SkillService.from_directory("./skills", adapter="pawly"),
     policy=PolicyService.local(routing=HeuristicPolicy()),
     audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY")),
 )
@@ -288,7 +289,7 @@ Cloud audit plus local audit file:
 ```python
 cloud_and_file = Pawly(
     "./worker.yaml",
-    skills=SkillService.from_directory("./skills"),
+    skills=SkillService.from_directory("./skills", adapter="pawly"),
     policy=PolicyService.local(routing=HeuristicPolicy()),
     audit=AuditService.cloud(
         api_key=os.getenv("PAWLY_API_KEY"),
@@ -302,10 +303,11 @@ Cloud skills from your local folder:
 ```python
 cloud_skills = Pawly(
     "./worker.yaml",
-    # Pawly reads your local skills folder and lets Cloud index/manage the project skills.
+    # The adapter reads the local folder shape so Cloud can index/manage the project skills.
     skills=SkillService.cloud(
         api_key=os.getenv("PAWLY_API_KEY"),
         directory="./skills",
+        adapter="pawly",
     ),
     policy=PolicyService.local(routing=HeuristicPolicy()),
     audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY")),
@@ -321,7 +323,7 @@ Cloud policy:
 ```python
 cloud_policy = Pawly(
     "./worker.yaml",
-    skills=SkillService.from_directory("./skills"),
+    skills=SkillService.from_directory("./skills", adapter="pawly"),
     policy=PolicyService.cloud(
         api_key=os.getenv("PAWLY_API_KEY"),
         routing=HeuristicPolicy(),

@@ -232,7 +232,7 @@ class GoalInterfaceTests(unittest.TestCase):
         self.assertEqual(result.result["order"], "123")
         self.assertEqual(result.action_receipt["skills"]["source"], "local")
 
-    def test_skills_can_be_loaded_from_a_directory(self) -> None:
+    def test_pawly_skill_directory_can_be_loaded_with_adapter(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             skills_dir = Path(tempdir) / "skills"
             skills_dir.mkdir()
@@ -247,7 +247,7 @@ skills = {"safe_reply": safe_reply}
             )
             pawly = Pawly(
                 str(self._worker_path(tempdir)),
-                skills=SkillService.from_directory(skills_dir),
+                skills=SkillService.from_directory(skills_dir, adapter="pawly"),
                 policy=PolicyService.local(routing=HeuristicPolicy()),
             )
 
@@ -255,7 +255,15 @@ skills = {"safe_reply": safe_reply}
 
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.result["order"], "123")
-        self.assertEqual(result.action_receipt["skills"]["source"], "directory")
+        self.assertEqual(result.action_receipt["skills"]["source"], "pawly-directory")
+
+    def test_directory_skill_loading_requires_adapter(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            skills_dir = Path(tempdir) / "skills"
+            skills_dir.mkdir()
+
+            with self.assertRaisesRegex(ValueError, "explicit adapter"):
+                SkillService.from_directory(skills_dir)  # type: ignore[call-arg]
 
     def test_openai_skill_directory_can_be_loaded_with_adapter(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -318,7 +326,7 @@ def handler(args, context):
             )
             pawly = Pawly(
                 str(self._worker_path(tempdir)),
-                skills=SkillService.cloud(directory=skills_dir),
+                skills=SkillService.cloud(directory=skills_dir, adapter="pawly"),
                 policy=PolicyService.local(routing=HeuristicPolicy()),
             )
 

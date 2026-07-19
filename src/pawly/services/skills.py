@@ -38,7 +38,7 @@ class SkillService:
         *,
         api_key: str | None = None,
         directory: str | Path | None = None,
-        adapter: str = "python",
+        adapter: str | None = None,
         skills: Mapping[str, Callable[[dict[str, Any], dict[str, Any]], Any]] | Sequence[Any] | None = None,
         api_url: str = DEFAULT_CLOUD_API_URL,
         console_url: str = DEFAULT_CLOUD_CONSOLE_URL,
@@ -55,12 +55,14 @@ class SkillService:
         cls,
         directory: str | Path,
         *,
-        adapter: str = "python",
+        adapter: str | None = None,
         recursive: bool = True,
     ) -> "SkillService":
+        if not adapter:
+            raise ValueError("directory skill loading requires an explicit adapter: pawly, openai, or claude")
         return cls(
             registry=_registry_from_definitions(_load_skill_definitions(directory, adapter=adapter, recursive=recursive)),
-            source=f"{adapter}-directory" if adapter != "python" else "directory",
+            source=f"{adapter}-directory",
         )
 
     @classmethod
@@ -179,11 +181,13 @@ class CloudSkillClient:
 def _skill_names(
     *,
     directory: str | Path | None,
-    adapter: str,
+    adapter: str | None,
     skills: Mapping[str, Callable[[dict[str, Any], dict[str, Any]], Any]] | Sequence[Any] | None,
 ) -> list[str]:
     names: list[str] = []
     if directory is not None:
+        if not adapter:
+            raise ValueError("directory skill loading requires an explicit adapter: pawly, openai, or claude")
         names.extend(_registry_from_definitions(_load_skill_definitions(directory, adapter=adapter)).action_names())
     if isinstance(skills, Mapping):
         names.extend(str(name).strip() for name in skills)
@@ -192,10 +196,10 @@ def _skill_names(
     return sorted({name for name in names if name})
 
 
-def _load_skill_definitions(directory: str | Path, *, adapter: str = "python", recursive: bool = True) -> list[Any]:
-    adapter = str(adapter or "python").strip().lower()
-    if adapter not in {"python", "openai", "claude"}:
-        raise ValueError("adapter must be one of: python, openai, claude")
+def _load_skill_definitions(directory: str | Path, *, adapter: str, recursive: bool = True) -> list[Any]:
+    adapter = str(adapter or "").strip().lower()
+    if adapter not in {"pawly", "openai", "claude"}:
+        raise ValueError("adapter must be one of: pawly, openai, claude")
     root = Path(directory)
     if not root.exists() or not root.is_dir():
         raise FileNotFoundError(f"skills directory not found: {root}")
@@ -211,7 +215,7 @@ def _load_skill_definitions(directory: str | Path, *, adapter: str = "python", r
 
 def _module_skill_definitions(module: Any, adapter: str, path: Path) -> list[Any]:
     definitions: list[Any] = []
-    if adapter == "python":
+    if adapter == "pawly":
         definitions.extend(_values_from_fields(module, ("skills", "tools")))
         definitions.extend(_single_values_from_fields(module, ("skill", "tool")))
         for field_name in ("handler", "executor", "run", "call"):
@@ -228,7 +232,7 @@ def _module_skill_definitions(module: Any, adapter: str, path: Path) -> list[Any
         definitions.extend(_values_from_fields(module, ("claude_skills", "skills")))
         definitions.extend(_single_values_from_fields(module, ("claude_skill", "skill")))
         return definitions
-    raise ValueError("adapter must be one of: python, openai, claude")
+    raise ValueError("adapter must be one of: pawly, openai, claude")
 
 
 def _values_from_fields(module: Any, field_names: Sequence[str]) -> list[Any]:
