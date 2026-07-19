@@ -208,8 +208,8 @@ which boundary stopped it.
 ### 4. Batch-register a skills folder
 
 After the first skill works, move your real tool code into a folder and import
-that folder. Open Pawly only auto-loads folders that follow the Pawly Python
-export shape; arbitrary framework folders should use an adapter.
+that folder. The default directory loader reads Pawly's Python export shape. If
+the folder comes from another framework, choose the matching adapter explicitly.
 
 Example folder:
 
@@ -316,7 +316,7 @@ Cloud marketplace skills can also be searched, tested, and added in the
 dashboard. The SDK does not need a manual skill-id list for that path; project
 skill selection is handled by Cloud.
 
-Cloud policy review:
+Cloud policy:
 
 ```python
 cloud_policy = Pawly(
@@ -338,9 +338,8 @@ the local development path remains usable.
 
 ### 6. Import existing framework folders
 
-Different frameworks store tools and skills differently, so Open Pawly only
-auto-loads known folder shapes. Use an adapter when the folder follows another
-framework's conventions.
+Different frameworks store tools and skills differently. Pick the adapter that
+matches the folder you are importing.
 
 OpenAI-style Python folder:
 
@@ -387,7 +386,7 @@ Think of the constructor as three replaceable pieces behind the same Pawprint:
 | Piece | Local mode | Cloud mode |
 | --- | --- | --- |
 | `skills` | A `skills/` directory, local callables, a `SkillRegistry`, or existing framework tools through adapters | Read a local skills directory for cloud registration, or use marketplace/project skills managed in the dashboard |
-| `policy` | Rule-based review plus optional local routing | Cloud policy review when selected |
+| `policy` | Rule-based review plus optional local routing | Cloud policy when selected |
 | `audit` | JSONL file or custom sink | Cloud dashboard sync, optionally also local JSONL |
 
 When `PAWLY_API_KEY` is missing, Pawly returns a configuration-required result

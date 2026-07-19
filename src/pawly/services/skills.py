@@ -205,36 +205,53 @@ def _load_skill_definitions(directory: str | Path, *, adapter: str = "python", r
         if path.name.startswith("_"):
             continue
         module = _load_python_module(path)
-        for field_name in ("skills", "tools"):
-            value = getattr(module, field_name, None)
-            if value is not None:
-                if isinstance(value, Mapping):
-                    definitions.extend(
-                        {"name": name, "executor": handler} if callable(handler) else handler
-                        for name, handler in value.items()
-                    )
-                else:
-                    definitions.extend(list(value))
-        for field_name in ("skill", "tool"):
-            value = getattr(module, field_name, None)
-            if value is not None:
-                definitions.append(value)
-        if adapter == "openai":
-            for field_name in ("openai_tool", "openai_tools"):
-                value = getattr(module, field_name, None)
-                if value is not None:
-                    definitions.extend(list(value) if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)) else [value])
-        if adapter == "claude":
-            for field_name in ("claude_skill", "claude_skills"):
-                value = getattr(module, field_name, None)
-                if value is not None:
-                    definitions.extend(list(value) if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)) else [value])
+        definitions.extend(_module_skill_definitions(module, adapter, path))
+    return definitions
+
+
+def _module_skill_definitions(module: Any, adapter: str, path: Path) -> list[Any]:
+    definitions: list[Any] = []
+    if adapter == "python":
+        definitions.extend(_values_from_fields(module, ("skills", "tools")))
+        definitions.extend(_single_values_from_fields(module, ("skill", "tool")))
         for field_name in ("handler", "executor", "run", "call"):
             value = getattr(module, field_name, None)
             if callable(value):
                 definitions.append({"name": path.stem, "executor": value})
                 break
-    return definitions
+        return definitions
+    if adapter == "openai":
+        definitions.extend(_values_from_fields(module, ("openai_tools", "tools")))
+        definitions.extend(_single_values_from_fields(module, ("openai_tool", "tool")))
+        return definitions
+    if adapter == "claude":
+        definitions.extend(_values_from_fields(module, ("claude_skills", "skills")))
+        definitions.extend(_single_values_from_fields(module, ("claude_skill", "skill")))
+        return definitions
+    raise ValueError("adapter must be one of: python, openai, claude")
+
+
+def _values_from_fields(module: Any, field_names: Sequence[str]) -> list[Any]:
+    values: list[Any] = []
+    for field_name in field_names:
+        value = getattr(module, field_name, None)
+        if value is None:
+            continue
+        if isinstance(value, Mapping):
+            values.extend({"name": name, "executor": handler} if callable(handler) else handler for name, handler in value.items())
+        elif _is_sequence(value):
+            values.extend(list(value))
+        else:
+            values.append(value)
+    return values
+
+
+def _single_values_from_fields(module: Any, field_names: Sequence[str]) -> list[Any]:
+    return [getattr(module, field_name) for field_name in field_names if getattr(module, field_name, None) is not None]
+
+
+def _is_sequence(value: Any) -> bool:
+    return isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray))
 
 
 def _load_python_module(path: Path) -> Any:

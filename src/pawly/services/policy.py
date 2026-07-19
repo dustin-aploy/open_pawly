@@ -64,7 +64,7 @@ class PolicyService:
             {
                 "level": "info",
                 "code": "cloud_policy_selected",
-                "message": "Cloud policy review is selected when available; local rules remain available during development.",
+                "message": "Cloud policy is selected when available; local rules remain available during development.",
                 "action": f"Open {dashboard_url} to review policy configuration.",
             }
         ]
