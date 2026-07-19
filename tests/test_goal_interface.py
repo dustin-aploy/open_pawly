@@ -218,20 +218,55 @@ class GoalInterfaceTests(unittest.TestCase):
         self.assertEqual(result.result["reply"], "safe reply to the duplicate charge question")
         self.assertEqual(result.action_receipt["skills"]["source"], "openai-tools")
 
-    def test_cloud_skills_without_api_key_return_configuration_step(self) -> None:
+    def test_skills_can_be_loaded_from_a_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
+            skills_dir = Path(tempdir) / "skills"
+            skills_dir.mkdir()
+            (skills_dir / "support.py").write_text(
+                """
+def safe_reply(args, context):
+    return {"reply": args["objective"], "order": context.get("order_id")}
+
+skills = {"safe_reply": safe_reply}
+""",
+                encoding="utf-8",
+            )
             pawly = Pawly(
                 str(self._worker_path(tempdir)),
-                skills=SkillService.cloud(skill_ids=["safe_reply"]),
+                skills=SkillService.from_directory(skills_dir),
                 policy=PolicyService.local(routing=HeuristicPolicy()),
             )
 
-            result = pawly.achieve(objective="safe reply to the duplicate charge question")
+            result = pawly.achieve(objective="safe reply to the duplicate charge question", context={"order_id": "123"})
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.result["order"], "123")
+        self.assertEqual(result.action_receipt["skills"]["source"], "directory")
+
+    def test_cloud_skills_without_api_key_return_configuration_step(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            skills_dir = Path(tempdir) / "skills"
+            skills_dir.mkdir()
+            (skills_dir / "support.py").write_text(
+                """
+def handler(args, context):
+    return {"reply": args["objective"]}
+""",
+                encoding="utf-8",
+            )
+            pawly = Pawly(
+                str(self._worker_path(tempdir)),
+                skills=SkillService.cloud(directory=skills_dir),
+                policy=PolicyService.local(routing=HeuristicPolicy()),
+            )
+
+            result = pawly.achieve(objective="support reply to the duplicate charge question")
 
         self.assertEqual(result.status, "configuration_required")
         self.assertEqual(result.error, "missing_api_key")
         self.assertEqual(result.action_receipt["missing_service"], "skills")
         self.assertEqual(result.action_receipt["skills"]["source"], "cloud-skills")
+        self.assertEqual(result.action_receipt["skills"]["capabilities"], ["support"])
         self.assertEqual(result.action_receipt["skills"]["alerts"][0]["code"], "missing_api_key")
 
 

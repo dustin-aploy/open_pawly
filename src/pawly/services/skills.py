@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import importlib.util
 import inspect
 import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 from urllib import error, request
 
@@ -35,16 +37,26 @@ class SkillService:
         cls,
         *,
         api_key: str | None = None,
-        skill_ids: Sequence[str] | None = None,
+        directory: str | Path | None = None,
+        skills: Mapping[str, Callable[[dict[str, Any], dict[str, Any]], Any]] | Sequence[Any] | None = None,
         api_url: str = DEFAULT_CLOUD_API_URL,
         console_url: str = DEFAULT_CLOUD_CONSOLE_URL,
     ) -> "SkillService":
         connection = CloudConnection(api_key=api_key, api_url=api_url, console_url=console_url)
-        client = HostedSkillClient(connection)
+        client = CloudSkillClient(connection)
         registry = SkillRegistry()
-        for skill_id in skill_ids or []:
-            registry.register(str(skill_id), client.handler(str(skill_id)))
+        for name in _skill_names(directory=directory, skills=skills):
+            registry.register(name, client.handler(name))
         return cls(registry=registry, source="cloud-skills", cloud_connection=connection)
+
+    @classmethod
+    def from_directory(
+        cls,
+        directory: str | Path,
+        *,
+        recursive: bool = True,
+    ) -> "SkillService":
+        return cls(registry=_registry_from_definitions(_load_skill_definitions(directory, recursive=recursive)), source="directory")
 
     @classmethod
     def from_openai_tools(
@@ -82,8 +94,8 @@ class SkillService:
             {
                 "level": "info",
                 "code": "cloud_skills_enabled",
-                "message": "Hosted skills selected in the dashboard can be called from this project.",
-                "action": f"Open {dashboard_url} to search, test, and add skills.",
+                "message": "Cloud skills for this project can be called through Pawly.",
+                "action": f"Open {dashboard_url} to search, test, and manage skills.",
             }
         ]
         if not self.cloud_connection.is_configured():
@@ -92,8 +104,8 @@ class SkillService:
                 {
                     "level": "warning",
                     "code": "missing_api_key",
-                    "message": "Hosted skills are selected but no PAWLY_API_KEY is configured.",
-                    "action": f"Create or copy a hosted key at {dashboard_url}.",
+                    "message": "Cloud skills are selected but no PAWLY_API_KEY is configured.",
+                    "action": f"Create or copy a cloud key at {dashboard_url}.",
                 },
             )
         if not self.registry.action_names():
@@ -101,8 +113,8 @@ class SkillService:
                 {
                     "level": "info",
                     "code": "no_cloud_skills_selected",
-                    "message": "No hosted skills are selected locally yet.",
-                    "action": f"Add marketplace skills to the project at {dashboard_url}.",
+                    "message": "No local skill source was provided for cloud registration.",
+                    "action": f"Add marketplace skills or connect a local skills directory at {dashboard_url}.",
                 }
             )
         return alerts
@@ -124,14 +136,14 @@ class SkillService:
 
 
 @dataclass(slots=True)
-class HostedSkillClient:
+class CloudSkillClient:
     connection: CloudConnection
 
     def handler(self, skill_id: str) -> Callable[[dict[str, Any], dict[str, Any]], Any]:
         def _call(args: dict[str, Any], context: dict[str, Any]) -> Any:
             if not self.connection.is_configured():
                 raise RuntimeError(
-                    "Hosted skill calls require PAWLY_API_KEY. Add the skill in the dashboard, copy the project key, then retry."
+                    "Cloud skill calls require PAWLY_API_KEY. Add or sync the skill in the dashboard, copy the project key, then retry."
                 )
             return self.call(skill_id=skill_id, args=args, context=context)
 
@@ -152,11 +164,97 @@ class HostedSkillClient:
             with request.urlopen(req, timeout=15.0) as response:
                 body = response.read().decode("utf-8")
         except (OSError, error.URLError, error.HTTPError) as exc:
-            raise RuntimeError(f"hosted skill call failed for {skill_id}: {exc}") from exc
+            raise RuntimeError(f"cloud skill call failed for {skill_id}: {exc}") from exc
         if not body:
             return {"status": "completed", "skill_id": skill_id}
         parsed = json.loads(body)
         return parsed if isinstance(parsed, dict) else {"result": parsed, "skill_id": skill_id}
+
+
+def _skill_names(
+    *,
+    directory: str | Path | None,
+    skills: Mapping[str, Callable[[dict[str, Any], dict[str, Any]], Any]] | Sequence[Any] | None,
+) -> list[str]:
+    names: list[str] = []
+    if directory is not None:
+        names.extend(_registry_from_definitions(_load_skill_definitions(directory)).action_names())
+    if isinstance(skills, Mapping):
+        names.extend(str(name).strip() for name in skills)
+    elif skills is not None:
+        names.extend(_registry_from_definitions(skills).action_names())
+    return sorted({name for name in names if name})
+
+
+def _load_skill_definitions(directory: str | Path, *, recursive: bool = True) -> list[Any]:
+    root = Path(directory)
+    if not root.exists() or not root.is_dir():
+        raise FileNotFoundError(f"skills directory not found: {root}")
+    pattern = "**/*.py" if recursive else "*.py"
+    definitions: list[Any] = []
+    for path in sorted(root.glob(pattern)):
+        if path.name.startswith("_"):
+            continue
+        module = _load_python_module(path)
+        for field_name in ("skills", "tools"):
+            value = getattr(module, field_name, None)
+            if value is not None:
+                if isinstance(value, Mapping):
+                    definitions.extend(
+                        {"name": name, "executor": handler} if callable(handler) else handler
+                        for name, handler in value.items()
+                    )
+                else:
+                    definitions.extend(list(value))
+        for field_name in ("skill", "tool"):
+            value = getattr(module, field_name, None)
+            if value is not None:
+                definitions.append(value)
+        for field_name in ("handler", "executor", "run", "call"):
+            value = getattr(module, field_name, None)
+            if callable(value):
+                definitions.append({"name": path.stem, "executor": value})
+                break
+    return definitions
+
+
+def _load_python_module(path: Path) -> Any:
+    module_name = f"_pawly_skill_{path.stem}_{abs(hash(path))}"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"unable to import skill module: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _registry_from_definitions(definitions: Sequence[Any]) -> SkillRegistry:
+    registry = SkillRegistry()
+    for definition in definitions:
+        name, executor = _skill_definition(definition)
+        registry.register(name, executor)
+    return registry
+
+
+def _skill_definition(definition: Any) -> tuple[str, Callable[[dict[str, Any], dict[str, Any]], Any]]:
+    if callable(definition) and not isinstance(definition, Mapping):
+        name = getattr(definition, "tool_name", None) or getattr(definition, "name", None) or definition.__name__
+        return str(name), _local_skill_handler(definition)
+    name = _extract_tool_value(definition, "tool_name", required=False)
+    if name is None:
+        name = _extract_tool_value(definition, "name", required=False)
+    executor = _extract_tool_value(definition, "executor", required=False)
+    if executor is None:
+        executor = _extract_tool_value(definition, "handler", required=False)
+    if executor is None:
+        executor = _extract_tool_value(definition, "run", required=False)
+    if executor is None:
+        executor = _extract_tool_value(definition, "call", required=False)
+    if not name:
+        raise ValueError("skill definition must provide name or tool_name")
+    if not callable(executor):
+        raise TypeError(f"skill '{name}' must provide a callable executor, handler, run, or call")
+    return str(name), _local_skill_handler(executor)
 
 
 def _extract_tool_value(value: Any, field_name: str, *, required: bool = True) -> Any:
@@ -187,5 +285,17 @@ def _openai_tool_handler(name: str, executor: Callable[..., Any]) -> Callable[[d
         if len(parameters) == 0:
             return executor()
         return executor(action_payload)
+
+    return handler
+
+
+def _local_skill_handler(executor: Callable[..., Any]) -> Callable[[dict[str, Any], dict[str, Any]], Any]:
+    def handler(args: dict[str, Any], context: dict[str, Any]) -> Any:
+        parameters = inspect.signature(executor).parameters
+        if len(parameters) == 0:
+            return executor()
+        if len(parameters) == 1:
+            return executor({**context, **args})
+        return executor(args, context)
 
     return handler

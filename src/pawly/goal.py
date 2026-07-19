@@ -96,7 +96,7 @@ class Pawly:
                 status="configuration_required",
                 objective=cleaned_objective,
                 error="missing_api_key",
-                needs=f"Copy a hosted key at {DEFAULT_CLOUD_CONSOLE_URL}.",
+                needs=f"Copy a cloud key at {DEFAULT_CLOUD_CONSOLE_URL}.",
                 action_receipt=self._receipt(
                     objective=cleaned_objective,
                     status="configuration_required",

@@ -64,7 +64,7 @@ class PolicyService:
             {
                 "level": "info",
                 "code": "cloud_policy_selected",
-                "message": "Hosted policy review is selected when available; local rules remain available during development.",
+                "message": "Cloud policy review is selected when available; local rules remain available during development.",
                 "action": f"Open {dashboard_url} to review policy configuration.",
             }
         ]
@@ -74,8 +74,8 @@ class PolicyService:
                 {
                     "level": "warning",
                     "code": "missing_api_key",
-                    "message": "Hosted policy is selected but no PAWLY_API_KEY is configured.",
-                    "action": f"Create or copy a hosted key at {dashboard_url}.",
+                    "message": "Cloud policy is selected but no PAWLY_API_KEY is configured.",
+                    "action": f"Create or copy a cloud key at {dashboard_url}.",
                 },
             )
         return alerts

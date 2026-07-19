@@ -33,7 +33,7 @@ class BestEffortAuditSink:
 
 @dataclass(slots=True)
 class AuditService:
-    """Action-record wiring for local files, custom sinks, and hosted dashboard sync."""
+    """Action-record wiring for local files, custom sinks, and cloud dashboard sync."""
 
     audit_path: str | Path | None = None
     sink: AuditSink | None = None
@@ -81,15 +81,15 @@ class AuditService:
                     {
                         "level": "warning",
                         "code": "missing_api_key",
-                        "message": "Hosted audit is selected but no PAWLY_API_KEY is configured.",
-                        "action": f"Create or copy a hosted key at {dashboard_url}.",
+                        "message": "Cloud audit is selected but no PAWLY_API_KEY is configured.",
+                        "action": f"Create or copy a cloud key at {dashboard_url}.",
                     }
                 )
             alerts.append(
                 {
                     "level": "info",
                     "code": "cloud_audit_enabled",
-                    "message": "Action records can appear in the hosted dashboard.",
+                    "message": "Action records can appear in the Cloud dashboard.",
                     "action": f"Open {dashboard_url} to review runs and handoffs.",
                 }
             )
