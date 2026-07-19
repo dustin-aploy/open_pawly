@@ -176,7 +176,6 @@ what was recorded for audit.
 When the agent starts touching real users or real accounts, keep the same three
 service shape and connect the parts you want to run through Pawly Cloud. Get a
 free project API key from [Pawly Developer](https://developer.aploy.ai/pawly).
-The key identifies the project; no project id is needed in code.
 
 ```bash
 export PAWLY_API_KEY="paste_the_project_key"
