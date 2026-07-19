@@ -21,42 +21,70 @@ DEFAULT_CLOUD_API_URL = "https://api.aploy.ai"
 
 @dataclass(slots=True)
 class CloudConnection:
-    """Project-scoped hosted connection for an otherwise local Pawly runtime.
+    """Hosted connection for an otherwise local Pawly runtime.
 
     CloudConnection does not replace a Pawprint. The local Pawprint remains the
-    source of capabilities and boundaries; the hosted project provides managed
-    project identity, optional action sync, and console visibility.
+    source of capabilities and boundaries; the hosted key provides managed
+    identity, optional action sync, and console visibility.
     """
 
-    project_id: str
     api_key: str | None = None
+    project_id: str | None = None
     api_url: str = DEFAULT_CLOUD_API_URL
     console_url: str = DEFAULT_CLOUD_CONSOLE_URL
     sync_actions: bool = True
+    sync_policy: bool = False
 
     def is_configured(self) -> bool:
         return bool(str(self.api_key or "").strip())
 
     def to_dict(self, *, include_secret: bool = False) -> dict[str, Any]:
         payload: dict[str, Any] = {
-            "mode": "hosted_project",
-            "project_id": self.project_id,
+            "mode": "hosted",
             "api_url": self.api_url.rstrip("/"),
             "console_url": self.console_url.rstrip("/"),
             "sync_actions": self.sync_actions,
+            "sync_policy": self.sync_policy,
             "api_key_configured": self.is_configured(),
         }
+        if self.project_id:
+            payload["project_id"] = self.project_id
         if include_secret and self.api_key:
             payload["api_key"] = self.api_key
         return payload
 
-    def build_audit_sink(self) -> HostedActionSyncAuditSink | None:
+    def build_audit_sink(self) -> AuditSink | None:
         if not self.sync_actions or not self.is_configured():
             return None
-        return HostedActionSyncAuditSink(
-            base_url=self.api_url,
-            api_key=str(self.api_key),
+        return BestEffortAuditSink(
+            HostedActionSyncAuditSink(
+                base_url=self.api_url,
+                api_key=str(self.api_key),
+            )
         )
+
+
+class BestEffortAuditSink:
+    name = "best-effort-cloud-action-sync"
+
+    def __init__(self, sink: HostedActionSyncAuditSink) -> None:
+        self.sink = sink
+        self.last_error: str | None = None
+
+    def append(self, event: Any) -> dict[str, Any]:
+        payload = event.to_dict()
+        try:
+            return self.sink.append(event)
+        except Exception as exc:
+            self.last_error = str(exc)
+            return payload
+
+    def load_events(self) -> list[dict[str, Any]]:
+        return []
+
+    def find_event(self, *, event_id: str | None = None, decision_id: str | None = None, event_type: str | None = None) -> dict[str, Any] | None:
+        del event_id, decision_id, event_type
+        return None
 
 
 @dataclass(slots=True)
@@ -99,31 +127,74 @@ class PawlyServices:
     def cloud(
         cls,
         *,
-        project_id: str,
         api_key: str | None = None,
+        project_id: str | None = None,
         api_url: str = DEFAULT_CLOUD_API_URL,
         console_url: str = DEFAULT_CLOUD_CONSOLE_URL,
-        policy: str = "cloud",
+        policy: str = "rules",
         scoring_policy: Policy | str | None = None,
         local_audit_path: str | Path | None = None,
         audit_sink: AuditSink | None = None,
         reviewer_backend: ReviewerPolicy | None = None,
         sync_actions: bool = True,
+        sync_policy: bool = False,
     ) -> "PawlyServices":
+        selected_policy = "cloud" if sync_policy else policy
         return cls(
             mode="cloud",
-            policy=policy,
+            policy=selected_policy,
             scoring_policy=scoring_policy,
             reviewer_backend=reviewer_backend,
             audit_path=local_audit_path,
             audit_sink=audit_sink,
             cloud_connection=CloudConnection(
-                project_id=project_id,
                 api_key=api_key,
+                project_id=project_id,
                 api_url=api_url,
                 console_url=console_url,
                 sync_actions=sync_actions,
+                sync_policy=sync_policy,
             ),
+        )
+
+    @classmethod
+    def cloud_audit(
+        cls,
+        *,
+        api_key: str | None = None,
+        local_audit_path: str | Path | None = None,
+        scoring_policy: Policy | str | None = None,
+        api_url: str = DEFAULT_CLOUD_API_URL,
+        console_url: str = DEFAULT_CLOUD_CONSOLE_URL,
+    ) -> "PawlyServices":
+        return cls.cloud(
+            api_key=api_key,
+            api_url=api_url,
+            console_url=console_url,
+            scoring_policy=scoring_policy,
+            local_audit_path=local_audit_path,
+            sync_actions=True,
+            sync_policy=False,
+        )
+
+    @classmethod
+    def cloud_policy(
+        cls,
+        *,
+        api_key: str | None = None,
+        local_audit_path: str | Path | None = None,
+        scoring_policy: Policy | str | None = None,
+        api_url: str = DEFAULT_CLOUD_API_URL,
+        console_url: str = DEFAULT_CLOUD_CONSOLE_URL,
+    ) -> "PawlyServices":
+        return cls.cloud(
+            api_key=api_key,
+            api_url=api_url,
+            console_url=console_url,
+            scoring_policy=scoring_policy,
+            local_audit_path=local_audit_path,
+            sync_actions=True,
+            sync_policy=True,
         )
 
     def is_configured(self) -> bool:
@@ -164,7 +235,64 @@ class PawlyServices:
             payload["scoring_policy"] = getattr(self.scoring_policy, "name", self.scoring_policy)
         if self.cloud_connection is not None:
             payload["cloud"] = self.cloud_connection.to_dict()
+            payload["dashboard_url"] = self.cloud_connection.console_url.rstrip("/")
+        alerts = self.alerts()
+        if alerts:
+            payload["alerts"] = alerts
         return payload
+
+    def alerts(self) -> list[dict[str, str]]:
+        alerts: list[dict[str, str]] = []
+        if self.cloud_connection is None:
+            if self.audit_path is not None:
+                alerts.append(
+                    {
+                        "level": "info",
+                        "code": "local_audit_enabled",
+                        "message": f"Action records are written to {self.audit_path}.",
+                        "action": "Open the local audit file when debugging a run.",
+                    }
+                )
+            return alerts
+
+        dashboard_url = self.cloud_connection.console_url.rstrip("/")
+        if not self.cloud_connection.is_configured():
+            alerts.append(
+                {
+                    "level": "warning",
+                    "code": "missing_api_key",
+                    "message": "Cloud services are selected but no PAWLY_API_KEY is configured.",
+                    "action": f"Create or copy a hosted key at {dashboard_url}.",
+                }
+            )
+        if self.cloud_connection.sync_actions:
+            alerts.append(
+                {
+                    "level": "info",
+                    "code": "cloud_audit_enabled",
+                    "message": "Action records can appear in the hosted dashboard.",
+                    "action": f"Open {dashboard_url} to review runs and handoffs.",
+                }
+            )
+        if self.audit_path is not None:
+            alerts.append(
+                {
+                    "level": "info",
+                    "code": "local_audit_enabled",
+                    "message": f"A local action record is also written to {self.audit_path}.",
+                    "action": "Use the local file for offline debugging or CI artifacts.",
+                }
+            )
+        if self.cloud_connection.sync_policy or self.policy == "cloud":
+            alerts.append(
+                {
+                    "level": "info",
+                    "code": "cloud_policy_selected",
+                    "message": "Cloud policy review is selected when available; Open Pawly keeps a local policy path for development.",
+                    "action": f"Open {dashboard_url} to review policy configuration.",
+                }
+            )
+        return alerts
 
 
 @dataclass(slots=True)
@@ -223,20 +351,22 @@ class Pawly:
     def connect_cloud(
         self,
         *,
-        project_id: str,
         api_key: str | None = None,
+        project_id: str | None = None,
         api_url: str = DEFAULT_CLOUD_API_URL,
         console_url: str = DEFAULT_CLOUD_CONSOLE_URL,
         sync_actions: bool = True,
+        sync_policy: bool = False,
     ) -> "Pawly":
         self.services = PawlyServices.cloud(
-            project_id=project_id,
             api_key=api_key,
+            project_id=project_id,
             api_url=api_url,
             console_url=console_url,
             local_audit_path=self.services.audit_path,
             audit_sink=self.services.audit_sink,
             sync_actions=sync_actions,
+            sync_policy=sync_policy,
         )
         self.cloud = self.services.cloud_connection
         if self.engine is not None:
@@ -290,7 +420,7 @@ class Pawly:
                 objective=cleaned_objective,
                 result=None,
                 error="missing_api_key",
-                needs=f"Copy the one-time project key for {self.cloud.project_id} at {self.cloud.console_url.rstrip('/')}.",
+                needs=f"Copy the hosted key at {self.cloud.console_url.rstrip('/')}.",
                 action_receipt=_receipt(
                     objective=cleaned_objective,
                     status="configuration_required",
@@ -423,7 +553,8 @@ def _receipt(
         payload["services"] = services.to_dict()
         if services.cloud_connection is not None:
             payload["cloud"] = services.cloud_connection.to_dict()
-            payload["project_id"] = services.cloud_connection.project_id
+            if services.cloud_connection.project_id:
+                payload["project_id"] = services.cloud_connection.project_id
     return payload
 
 
@@ -477,7 +608,7 @@ def _resolve_services(
         return PawlyServices(**payload)
     resolved_cloud = _resolve_cloud_connection(cloud=cloud, api_key=api_key, project_id=project_id)
     if resolved_cloud is not None:
-        return PawlyServices(mode="cloud", policy="cloud", cloud_connection=resolved_cloud)
+        return PawlyServices(mode="cloud", policy="rules", cloud_connection=resolved_cloud)
     return PawlyServices.local()
 
 
@@ -493,9 +624,7 @@ def _resolve_cloud_connection(
         return CloudConnection(**dict(cloud))
     if api_key is None and project_id is None:
         return None
-    if not project_id:
-        raise ValueError("project_id is required when api_key is provided. Use CloudConnection(project_id=..., api_key=...).")
-    return CloudConnection(project_id=project_id, api_key=api_key)
+    return CloudConnection(api_key=api_key, project_id=project_id)
 
 
 def _merge_service_audit_sink(
@@ -515,7 +644,7 @@ def _merge_service_audit_sink(
     return _combine_audit_sinks(selected, hosted)
 
 
-def _combine_audit_sinks(existing: AuditSink, hosted: HostedActionSyncAuditSink) -> AuditSink:
+def _combine_audit_sinks(existing: AuditSink, hosted: AuditSink) -> AuditSink:
     if isinstance(existing, CompositeAuditSink):
         return CompositeAuditSink([*existing.sinks, hosted])
     return CompositeAuditSink([existing, hosted])

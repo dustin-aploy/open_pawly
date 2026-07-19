@@ -203,63 +203,23 @@ If the objective matches a registered skill and the policy allows it, Pawly runs
 the skill. If the objective needs review or is blocked, the receipt tells you
 which boundary stopped it.
 
-### 4. Connect a hosted project when you need one
+### 4. Choose where policy and action records run
 
-Open Pawly works locally. A hosted project is useful when a team wants the same
-runs visible in a console, a project-scoped key, or review workflows outside the
-process running the agent. Create one at https://developer.aploy.ai/pawly. The
-project key is shown once in the web console.
-
-The hosted project does not replace `worker.yaml`. Your Pawprint remains the
-source of capabilities and boundaries. Cloud connection details are a separate,
-structured project connection that can sync receipts and review state.
+Open Pawly and hosted Pawly use the same constructor shape. Your Pawprint stays
+the source of capabilities and boundaries; services decide where policy review
+runs and where action records are written. A hosted key is unique on its own, so
+you do not need to pass a project id.
 
 ```bash
-# Paste the one-time project key from the web console.
+# Paste the one-time hosted key from the web console.
 export PAWLY_API_KEY="paste_the_project_key"
-export PAWLY_PROJECT_ID="proj_..."
 ```
 
-```python
-import os
-from pawly import HeuristicPolicy, Pawly, PawlyServices, SkillRegistry
-
-# Keep the same Pawprint and local skills you used above.
-skills = SkillRegistry()
-skills.register(
-    "safe_reply",
-    lambda args, context: {
-        "message": "We checked your order and will follow up safely.",
-        "objective": args["objective"],
-    },
-)
-
-hosted = Pawly(
-    "./worker.yaml",
-    skill_registry=skills,
-    services=PawlyServices.cloud(
-        project_id=os.getenv("PAWLY_PROJECT_ID", ""),
-        api_key=os.getenv("PAWLY_API_KEY"),
-        # Action records can be synced to the hosted dashboard.
-        # The same runtime can also keep a local audit file.
-        local_audit_path="./pawly-audit.jsonl",
-        # Use local action routing unless you pass a cloud scoring policy.
-        scoring_policy=HeuristicPolicy(),
-    ),
-)
-
-result = hosted.achieve(
-    # The goal interface stays the same, so you can start local and connect later.
-    objective="safe reply to the duplicate charge question",
-    context={"source": "first_connection"},
-)
-print(result.status)
-print(result.action_receipt["cloud"])
-```
-
-Local-only uses the same constructor shape:
+Local file only:
 
 ```python
+from pawly import HeuristicPolicy, Pawly, PawlyServices
+
 local = Pawly(
     "./worker.yaml",
     skill_registry=skills,
@@ -271,19 +231,106 @@ local = Pawly(
 )
 ```
 
+Cloud audit, local policy:
+
+```python
+import os
+from pawly import HeuristicPolicy, Pawly, PawlyServices
+
+cloud_audit = Pawly(
+    "./worker.yaml",
+    skill_registry=skills,
+    services=PawlyServices.cloud_audit(
+        api_key=os.getenv("PAWLY_API_KEY"),
+        scoring_policy=HeuristicPolicy(),
+    ),
+)
+
+result = cloud_audit.achieve(
+    objective="safe reply to the duplicate charge question",
+    context={"order_id": "123"},
+)
+print(result.action_receipt["services"]["alerts"])
+```
+
+Cloud audit plus local audit file:
+
+```python
+cloud_and_file = Pawly(
+    "./worker.yaml",
+    skill_registry=skills,
+    services=PawlyServices.cloud_audit(
+        api_key=os.getenv("PAWLY_API_KEY"),
+        scoring_policy=HeuristicPolicy(),
+        local_audit_path="./pawly-audit.jsonl",
+    ),
+)
+```
+
+Cloud policy review:
+
+```python
+cloud_policy = Pawly(
+    "./worker.yaml",
+    skill_registry=skills,
+    services=PawlyServices.cloud_policy(
+        api_key=os.getenv("PAWLY_API_KEY"),
+        scoring_policy=HeuristicPolicy(),
+    ),
+)
+```
+
+If cloud policy is not available for the current key or environment, Open Pawly
+keeps the local policy path available during development and includes a dashboard
+entry in the receipt alerts.
+
+### 5. Batch-wrap skills you already have
+
+You do not need to rewrite existing application code. Register small wrappers
+around the services your agent already calls.
+
+```python
+from pawly import Pawly, PawlyServices, SkillRegistry
+
+class SupportActions:
+    def safe_reply(self, args, context):
+        return ticket_system.reply(
+            ticket_id=context["ticket_id"],
+            body=f"We checked this safely: {args['objective']}",
+        )
+
+    def summarize_ticket(self, args, context):
+        return ticket_system.summarize(context["ticket_id"])
+
+existing = SupportActions()
+skills = SkillRegistry()
+
+for name, handler in {
+    "safe_reply": existing.safe_reply,
+    "summarize_ticket": existing.summarize_ticket,
+}.items():
+    skills.register(name, handler)
+
+pawly = Pawly(
+    "./worker.yaml",
+    skill_registry=skills,
+    services=PawlyServices.cloud_audit(api_key=os.getenv("PAWLY_API_KEY")),
+)
+```
+
 Think of `PawlyServices` as the service wiring behind the same Pawprint:
 
 | Service | Local mode | Cloud mode |
 | --- | --- | --- |
-| Policy review | Rule-based Pawprint evaluation or your own reviewer backend | Hosted policy reviewer when configured, with local fallback in Open Pawly |
+| Policy review | Rule-based Pawprint evaluation or your own reviewer backend | Hosted policy reviewer when selected, with local development fallback |
 | Action routing | Local `Policy` such as `HeuristicPolicy` or your custom policy | Cloud scoring policy when provided, or the same local policy |
 | Action records | Local JSONL audit file or custom audit sink | Hosted action sync for dashboard visibility, optionally also local JSONL |
 
 When `PAWLY_API_KEY` is missing, Pawly returns a configuration-required result
 with a link to the developer console instead of failing with an unclear error.
 When a cloud key is provided without a Pawprint path, Pawly returns
-`missing_pawprint` because the hosted project is a connection layer, not the
-local execution contract.
+`missing_pawprint` because services are runtime wiring, not the local execution
+contract.
 
 ## Public API
 
@@ -329,8 +376,7 @@ Common statuses:
 | --- | --- |
 | `completed` | A matching local skill ran successfully. |
 | `unsupported_goal` | No registered skill matched the delegated objective. |
-| `accepted` | Hosted project input was accepted without local execution. |
-| `configuration_required` | A hosted project key is missing; create one in the developer console. |
+| `configuration_required` | A Pawprint path or hosted key is missing; the receipt includes the next step. |
 | `failed` | Local execution failed or was blocked. |
 
 ## Architecture

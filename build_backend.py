@@ -12,6 +12,7 @@ import hashlib
 from io import StringIO
 import os
 from pathlib import Path
+import tarfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
@@ -21,6 +22,7 @@ PROJECT_NAME = "pawly"
 VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 DIST_INFO = f"{DIST_NAME}-{VERSION}.dist-info"
 WHEEL_NAME = f"{DIST_NAME}-{VERSION}-py3-none-any.whl"
+SDIST_NAME = f"{DIST_NAME}-{VERSION}.tar.gz"
 ENTRY_POINTS = "[console_scripts]\npawly = pawly.cli:main\n"
 REQUIRES_DIST = ["pawly-pawprint>=0.1.0"]
 
@@ -91,6 +93,10 @@ def get_requires_for_build_wheel(config_settings=None) -> list[str]:
     return []
 
 
+def get_requires_for_build_sdist(config_settings=None) -> list[str]:
+    return []
+
+
 def get_requires_for_build_editable(config_settings=None) -> list[str]:
     return []
 
@@ -130,6 +136,18 @@ def _write_wheel(wheel_directory: str, editable: bool) -> str:
 
 def build_wheel(wheel_directory: str, config_settings=None, metadata_directory=None) -> str:
     return _write_wheel(wheel_directory, editable=False)
+
+
+def build_sdist(sdist_directory: str, config_settings=None) -> str:
+    sdist_path = Path(sdist_directory) / SDIST_NAME
+    prefix = f"{DIST_NAME}-{VERSION}"
+    included_roots = ["src", "tests", "README.md", "LICENSE", "VERSION", "pyproject.toml", "build_backend.py"]
+    with tarfile.open(sdist_path, "w:gz") as tf:
+        for item in included_roots:
+            path = ROOT / item
+            if path.exists():
+                tf.add(path, arcname=f"{prefix}/{item}")
+    return SDIST_NAME
 
 
 def build_editable(wheel_directory: str, config_settings=None, metadata_directory=None) -> str:
