@@ -98,31 +98,25 @@ package named `pawprint`.
 
 ## Quickstart
 
-### 1. Declare the agent boundary
+### 1. Declare what the agent may do
 
-Create `worker.yaml`. The `capabilities` list describes what the agent may ask
-Pawly to do. The `boundaries` section is the policy: allow safe work, require
-review for sensitive work, and block work that should never run automatically.
+Create `worker.yaml` with the actions Pawly is allowed to consider. Keep the
+first version small: one safe action, one review-only action, and one action that
+should never run automatically.
 
 ```yaml
 id: support-worker
 name: Support Worker
-role: Support action runner
-summary: Handles low-risk support replies and hands off sensitive customer actions.
 
 capabilities:
-  # Capabilities are the actions your agent may delegate to Pawly.
   - safe_reply
   - issue_refund
 
 boundaries:
-  # Safe to run automatically.
   auto:
     - safe_reply
-  # Must produce a review path before execution.
   ask_first:
     - issue_refund
-  # Never run automatically.
   never:
     - delete_customer
 
@@ -130,11 +124,6 @@ handoff:
   to: support-lead
   when:
     - refund requested
-    - customer asks for an exception
-
-style:
-  tone: clear and practical
-  format: concise support update
 ```
 
 Validate it:
@@ -143,14 +132,10 @@ Validate it:
 python -m pawprint.validate ./worker.yaml
 ```
 
-If validation reports different boundary field names, update `pawprint` and
-`pawly-pawprint` together. The Pawprint file, the local runtime, and any cloud
-project connection should all use the same schema version.
+### 2. Register skills and run a goal
 
-### 2. Register the skills Pawly is allowed to run
-
-Start with an explicit local skill map. A map works for one skill or many, so the
-same shape can grow with your agent.
+Register the functions Pawly may execute, then delegate an objective. Pawly
+chooses a registered skill only if the boundary allows it.
 
 ```python
 from pawly import HeuristicPolicy, Pawly, PolicyService, SkillService
@@ -167,38 +152,25 @@ pawly = Pawly(
     skills=SkillService.local({"safe_reply": safe_reply}),
     policy=PolicyService.local(routing=HeuristicPolicy()),
 )
-```
 
-Pawly only executes registered skills. This keeps prompt output separate from
-real system actions.
-
-### 3. Delegate a goal and inspect the receipt
-
-```python
 result = pawly.achieve(
-    # Your agent delegates an objective; Pawly chooses an allowed skill.
     objective="safe reply to the duplicate charge question",
-    # Context becomes the resource scope recorded in the receipt.
     context={"order_id": "123", "channel": "chat"},
-    # Constraints become execution limits or approval policy inputs.
     constraints={"max_cost": 2},
 )
 
 print(result.status)
 print(result.result)
-print(result.action_receipt["execution_envelope"])
+print(result.action_receipt)
 ```
 
-If the objective matches a registered skill and the policy allows it, Pawly runs
-the skill. If the objective needs review or is blocked, the receipt tells you
-which boundary stopped it.
+The receipt shows which capability was selected, which boundary applied, and
+what was recorded for audit.
 
-### 4. Connect an existing skills folder
+### 3. Connect an existing skills folder
 
 Many agent projects already keep related skills or tools in one folder. Connect
-that folder through an adapter so Pawly can read the expected export shape
-instead of guessing how arbitrary files are structured. Use `adapter="pawly"` for
-Pawly's simple Python shape.
+that folder through an adapter so Pawly reads a known format instead of guessing.
 
 ```text
 skills/
@@ -214,31 +186,39 @@ def safe_reply(args, context):
 skills = {"safe_reply": safe_reply}
 ```
 
-Replace only the `skills=` line from the previous step:
+Replace the `skills=` line:
 
 ```python
 skills=SkillService.from_directory("./skills", adapter="pawly")
 ```
 
-### 5. Add audit and cloud services
-
-Keep one `Pawly(...)` object and swap services as your needs grow. Your Pawprint
-stays the source of capabilities and boundaries. Add imports only when you use
-the matching service:
+Existing framework folders use their own adapters:
 
 ```python
-import os
-from pawly import AuditService
+skills=SkillService.from_directory("./openai_tools", adapter="openai")
+skills=SkillService.from_directory("./claude_skills", adapter="claude")
 ```
 
-Local audit writes receipts to a file:
+If your framework already creates tool objects in code, pass those directly:
+
+```python
+skills=SkillService.from_openai_tools(openai_tools)
+```
+
+### 4. Optional upgrades
+
+Keep the same `Pawly(...)` object and swap one service at a time.
+For audit snippets, add `AuditService` to the import line. For cloud snippets,
+also add `import os`.
+
+Write receipts locally:
 
 ```python
 audit=AuditService.local("./pawly-audit.jsonl")
 ```
 
-Cloud audit sends receipts to the dashboard. The API key identifies the project;
-you do not need to pass a project id.
+Sync receipts to a project timeline. The API key identifies the project, so no
+project id is needed in code:
 
 ```bash
 export PAWLY_API_KEY="paste_the_project_key"
@@ -248,7 +228,7 @@ export PAWLY_API_KEY="paste_the_project_key"
 audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY"))
 ```
 
-You can keep the local file while also syncing to Cloud:
+Keep a local file while syncing:
 
 ```python
 audit=AuditService.cloud(
@@ -257,7 +237,8 @@ audit=AuditService.cloud(
 )
 ```
 
-Cloud skills use the same adapter rule as local folders:
+Let the project call cloud-managed skills while keeping the same adapter rule for
+local folders:
 
 ```python
 skills=SkillService.cloud(
@@ -267,10 +248,7 @@ skills=SkillService.cloud(
 )
 ```
 
-Marketplace skills are selected in the dashboard, so the SDK does not need a
-manual skill-id list for that path.
-
-Cloud policy keeps the same local fallback shape:
+Use managed policy when available, with local routing as the fallback:
 
 ```python
 policy=PolicyService.cloud(
@@ -279,62 +257,17 @@ policy=PolicyService.cloud(
 )
 ```
 
-The public API intentionally uses one `PolicyService`. Internally, Open Pawly
-bridges that service to boundary review and action routing, so you do not need
-to decide between similarly named policy hooks. If cloud policy is unavailable
-for the current key or environment, the receipt includes a dashboard entry and
-the local development path remains usable.
+Marketplace skills are selected in the dashboard, so the SDK does not need a
+manual skill-id list for that path. If a cloud key is missing, Pawly returns a
+configuration step with a console link instead of failing with an unclear error.
 
-### 6. Import existing framework skills
-
-Pick the adapter that matches the folder you are importing.
-
-OpenAI-style Python folder:
-
-```python
-skills = SkillService.from_directory("./openai_tools", adapter="openai")
-```
-
-Claude-style Python folder:
-
-```python
-skills = SkillService.from_directory("./claude_skills", adapter="claude")
-```
-
-If your framework already builds tool objects in code, register those objects
-directly instead of reading a folder.
-
-```python
-openai_tools = [
-    {
-        "tool_name": "safe_reply",
-        "executor": lambda payload: ticket_system.reply(
-            ticket_id=payload["payload"]["ticket_id"],
-            body=f"We checked this safely: {payload['payload']['objective']}",
-        ),
-    },
-    {
-        "tool_name": "summarize_ticket",
-        "executor": lambda payload: ticket_system.summarize(payload["payload"]["ticket_id"]),
-    },
-]
-
-skills=SkillService.from_openai_tools(openai_tools)
-```
-
-Think of the constructor as three replaceable pieces behind the same Pawprint:
+### Constructor shape
 
 | Piece | Local mode | Cloud mode |
 | --- | --- | --- |
 | `skills` | Local callables, a `SkillRegistry`, or an adapter-backed skills directory | Read an adapter-backed local skills directory for cloud registration, or use marketplace/project skills managed in the dashboard |
 | `policy` | Rule-based review plus optional local routing | Cloud policy when selected |
 | `audit` | JSONL file or custom sink | Cloud dashboard sync, optionally also local JSONL |
-
-When `PAWLY_API_KEY` is missing, Pawly returns a configuration-required result
-with a link to the developer console instead of failing with an unclear error.
-When a cloud key is provided without a Pawprint path, Pawly returns
-`missing_pawprint` because services are runtime wiring, not the local execution
-contract.
 
 ## Public API
 
