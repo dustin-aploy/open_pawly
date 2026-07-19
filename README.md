@@ -193,11 +193,12 @@ If the objective matches a registered skill and the policy allows it, Pawly runs
 the skill. If the objective needs review or is blocked, the receipt tells you
 which boundary stopped it.
 
-### 4. Move skills into a folder
+### 4. Connect an existing skills folder
 
-Once the local map works, move the same skill code into a folder. Folder imports
-always go through an adapter because each framework has its own export shape.
-Use `adapter="pawly"` for Pawly's simple Python shape.
+Many agent projects already keep related skills or tools in one folder. Connect
+that folder through an adapter so Pawly can read the expected export shape
+instead of guessing how arbitrary files are structured. Use `adapter="pawly"` for
+Pawly's simple Python shape.
 
 ```text
 skills/
