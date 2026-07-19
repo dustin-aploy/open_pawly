@@ -132,13 +132,14 @@ Validate it:
 python -m pawprint.validate ./worker.yaml
 ```
 
-### 2. Register skills and run a goal
+### 2. Define services and run a goal
 
-Register the functions Pawly may execute, then delegate an objective. Pawly
-chooses a registered skill only if the boundary allows it.
+Register the functions Pawly may execute, choose the policy that decides whether
+they can run, and choose where receipts are written. The three services stay
+separate on purpose: replace one without changing the others.
 
 ```python
-from pawly import HeuristicPolicy, Pawly, PolicyService, SkillService
+from pawly import AuditService, HeuristicPolicy, Pawly, PolicyService, SkillService
 
 def safe_reply(args, context):
     return {
@@ -147,10 +148,15 @@ def safe_reply(args, context):
         "order_id": context.get("order_id"),
     }
 
+skills = SkillService.local({"safe_reply": safe_reply})
+policy = PolicyService.local(routing=HeuristicPolicy())
+audit = AuditService.local("./pawly-audit.jsonl")
+
 pawly = Pawly(
     "./worker.yaml",
-    skills=SkillService.local({"safe_reply": safe_reply}),
-    policy=PolicyService.local(routing=HeuristicPolicy()),
+    skills=skills,
+    policy=policy,
+    audit=audit,
 )
 
 result = pawly.achieve(
@@ -167,7 +173,31 @@ print(result.action_receipt)
 The receipt shows which capability was selected, which boundary applied, and
 what was recorded for audit.
 
-### 3. Connect an existing skills folder
+When the agent starts touching real users or real accounts, keep the same three
+service shape and connect the parts you want to run through Pawly Cloud. Get a
+free project API key from [Pawly Developer](https://developer.aploy.ai/pawly).
+The key identifies the project; no project id is needed in code.
+
+```bash
+export PAWLY_API_KEY="paste_the_project_key"
+```
+
+```python
+import os
+from pawly import AuditService, HeuristicPolicy, PolicyService, SkillService
+
+api_key = os.getenv("PAWLY_API_KEY")
+
+skills = SkillService.local({"safe_reply": safe_reply})
+policy = PolicyService.cloud(api_key=api_key, routing=HeuristicPolicy())
+audit = AuditService.cloud(api_key=api_key, local_path="./pawly-audit.jsonl")
+```
+
+That setup still has a local audit file, while the same run can appear in the
+project timeline. If the key is missing, Pawly returns a configuration step with
+the console link instead of an unclear runtime failure.
+
+### 3. Connect existing skills
 
 Many agent projects already keep related skills or tools in one folder. Connect
 that folder through an adapter so Pawly reads a known format instead of guessing.
@@ -205,41 +235,9 @@ If your framework already creates tool objects in code, pass those directly:
 skills=SkillService.from_openai_tools(openai_tools)
 ```
 
-### 4. Add a project API key when runs matter
-
-You can keep receipts in a local file:
-
-```python
-audit=AuditService.local("./pawly-audit.jsonl")
-```
-
-When the agent starts touching real users or real accounts, get a free project
-API key from [Pawly Developer](https://developer.aploy.ai/pawly) and send
-receipts to a project timeline. The key identifies the project; no project id is
-needed in code.
-
-```bash
-export PAWLY_API_KEY="paste_the_project_key"
-```
-
-```python
-import os
-from pawly import AuditService
-
-audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY"))
-```
-
-Keep a local file while syncing:
-
-```python
-audit=AuditService.cloud(
-    api_key=os.getenv("PAWLY_API_KEY"),
-    local_path="./pawly-audit.jsonl",
-)
-```
-
-The same key can unlock cloud-managed skills, so you can add capability without
-shipping more tool glue:
+Cloud uses the same `SkillService` slot. Use it when you want the project to
+call skills selected or managed from the dashboard, or when you want to sync a
+known local folder through an adapter:
 
 ```python
 skills=SkillService.cloud(
@@ -249,19 +247,9 @@ skills=SkillService.cloud(
 )
 ```
 
-It can also use managed policy for smarter routing and consistent review
-behavior. Local routing remains the fallback:
-
-```python
-policy=PolicyService.cloud(
-    api_key=os.getenv("PAWLY_API_KEY"),
-    routing=HeuristicPolicy(),
-)
-```
-
 Marketplace skills are selected in the dashboard, so the SDK does not need a
-manual skill-id list. If a cloud key is missing, Pawly returns a configuration
-step with a console link instead of failing with an unclear error.
+manual skill-id list. Local folders still require an explicit adapter because
+Pawly should read a known format instead of guessing.
 
 ## Public API
 
