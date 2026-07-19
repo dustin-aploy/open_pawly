@@ -117,28 +117,36 @@ Pawly to do. The `boundaries` section is the policy: allow safe work, require
 review for sensitive work, and block work that should never run automatically.
 
 ```yaml
-metadata:
-  id: support-worker
-  name: Support Worker
-  description: Local support action boundary.
+id: support-worker
+name: Support Worker
+role: Support action runner
+summary: Handles low-risk support replies and hands off sensitive customer actions.
 
 capabilities:
   # Capabilities are the actions your agent may delegate to Pawly.
-  - name: safe_reply
-    description: Send a low-risk support reply.
-  - name: issue_refund
-    description: Refund a customer order.
+  - safe_reply
+  - issue_refund
 
 boundaries:
   # Safe to run automatically.
-  allow:
+  auto:
     - safe_reply
   # Must produce a review path before execution.
-  review:
+  ask_first:
     - issue_refund
   # Never run automatically.
-  block:
+  never:
     - delete_customer
+
+handoff:
+  to: support-lead
+  when:
+    - refund requested
+    - customer asks for an exception
+
+style:
+  tone: clear and practical
+  format: concise support update
 ```
 
 Validate it:
@@ -146,6 +154,10 @@ Validate it:
 ```bash
 python -m pawprint.validate ./worker.yaml
 ```
+
+If validation reports different boundary field names, update `pawprint` and
+`pawly-pawprint` together. The Pawprint file, the local runtime, and any hosted
+project connection should all use the same schema version.
 
 ### 2. Register the skills Pawly is allowed to run
 
@@ -198,6 +210,10 @@ runs visible in a console, a project-scoped key, or review workflows outside the
 process running the agent. Create one at https://developer.aploy.ai/pawly. The
 project key is shown once in the web console.
 
+The hosted project does not replace `worker.yaml`. Your Pawprint remains the
+source of capabilities and boundaries. Cloud connection details are a separate,
+structured project connection that can sync receipts and review state.
+
 ```bash
 # Paste the one-time project key from the web console.
 export PAWLY_API_KEY="paste_the_project_key"
@@ -206,25 +222,68 @@ export PAWLY_PROJECT_ID="proj_..."
 
 ```python
 import os
-from pawly import Pawly
+from pawly import HeuristicPolicy, Pawly, PawlyServices, SkillRegistry
 
-# Use this path when the agent should report to a hosted project.
+# Keep the same Pawprint and local skills you used above.
+skills = SkillRegistry()
+skills.register(
+    "safe_reply",
+    lambda args, context: {
+        "message": "We checked your order and will follow up safely.",
+        "objective": args["objective"],
+    },
+)
+
 hosted = Pawly(
-    api_key=os.getenv("PAWLY_API_KEY"),
-    project_id=os.getenv("PAWLY_PROJECT_ID"),
+    "./worker.yaml",
+    skill_registry=skills,
+    services=PawlyServices.cloud(
+        project_id=os.getenv("PAWLY_PROJECT_ID", ""),
+        api_key=os.getenv("PAWLY_API_KEY"),
+        # Action records can be synced to the hosted dashboard.
+        # The same runtime can also keep a local audit file.
+        local_audit_path="./pawly-audit.jsonl",
+        # Use local action routing unless you pass a cloud scoring policy.
+        scoring_policy=HeuristicPolicy(),
+    ),
 )
 
 result = hosted.achieve(
     # The goal interface stays the same, so you can start local and connect later.
-    objective="resolve a customer issue safely",
+    objective="safe reply to the duplicate charge question",
     context={"source": "first_connection"},
 )
 print(result.status)
-print(result.needs)
+print(result.action_receipt["cloud"])
 ```
+
+Local-only uses the same constructor shape:
+
+```python
+local = Pawly(
+    "./worker.yaml",
+    skill_registry=skills,
+    services=PawlyServices.local(
+        policy="rules",
+        scoring_policy=HeuristicPolicy(),
+        audit_path="./pawly-audit.jsonl",
+    ),
+)
+```
+
+Think of `PawlyServices` as the service wiring behind the same Pawprint:
+
+| Service | Local mode | Cloud mode |
+| --- | --- | --- |
+| Policy review | Rule-based Pawprint evaluation or your own reviewer backend | Hosted policy reviewer when configured, with local fallback in Open Pawly |
+| Action routing | Local `Policy` such as `HeuristicPolicy` or your custom policy | Cloud scoring policy when provided, or the same local policy |
+| Action records | Local JSONL audit file or custom audit sink | Hosted action sync for dashboard visibility, optionally also local JSONL |
 
 When `PAWLY_API_KEY` is missing, Pawly returns a configuration-required result
 with a link to the developer console instead of failing with an unclear error.
+When a cloud key is provided without a Pawprint path, Pawly returns
+`missing_pawprint` because the hosted project is a connection layer, not the
+local execution contract.
 
 ## Public API
 

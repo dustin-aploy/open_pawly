@@ -63,7 +63,7 @@ from .backends import (
 )
 from .decision_engine import ActionCandidate, ActionDecision, DecisionEngine
 from .gateway import ExecutionGateway, GatewayProtocol, wrap_execute_fn, wrap_executor, wrap_framework_adapter
-from .goal import GoalExecutionResult, Pawly
+from .goal import CloudConnection, GoalExecutionResult, Pawly, PawlyServices
 from .loader.yaml_loader import load_yaml_file
 from .pawprint_loader import (
     PROTECTED_SKILL_WARNING,
@@ -99,6 +99,7 @@ __all__ = [
     "ActionDecision",
     "AuditSink",
     "CloudReviewer",
+    "CloudConnection",
     "CallbackApprovalNotifier",
     "ClaudeSkillInvocation",
     "ClaudeSkillsPawAdapter",
@@ -135,6 +136,7 @@ __all__ = [
     "PolicyScore",
     "PawlyRuntime",
     "Pawly",
+    "PawlyServices",
     "ProtectedAuditRedactingSink",
     "ReviewerPolicy",
     "ReviewerBackend",

@@ -4,10 +4,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pawly import GoalExecutionResult, HeuristicPolicy, Pawly, SkillRegistry, achieve
+from pawly import CloudConnection, GoalExecutionResult, HeuristicPolicy, Pawly, PawlyServices, SkillRegistry, achieve
+from pawly.loader.schema_loader import load_schema
 
 
-BASIC_WORKER = """
+LEGACY_WORKER = """
 metadata:
   id: goal-worker
   name: Goal Worker
@@ -28,10 +29,39 @@ boundaries:
 """
 
 
+CURRENT_WORKER = """
+id: goal-worker
+name: Goal Worker
+role: Support action runner
+summary: Worker for goal interface tests with safe replies and refund handoff.
+capabilities:
+  - safe_reply
+  - issue_refund
+boundaries:
+  auto:
+    - safe_reply
+  ask_first: []
+  never:
+    - issue_refund
+handoff:
+  to: support-lead
+  when:
+    - refund requested
+style:
+  tone: clear and practical
+  format: concise support update
+"""
+
+
+def _basic_worker() -> str:
+    required = load_schema("pawprint.schema.json").get("required", [])
+    return CURRENT_WORKER if "metadata" not in required else LEGACY_WORKER
+
+
 class GoalInterfaceTests(unittest.TestCase):
     def _worker_path(self, tempdir: str) -> Path:
         path = Path(tempdir) / "worker.yaml"
-        path.write_text(BASIC_WORKER, encoding="utf-8")
+        path.write_text(_basic_worker(), encoding="utf-8")
         return path
 
     def test_achieve_resolves_goal_to_registered_skill_and_returns_receipt(self) -> None:
@@ -72,25 +102,70 @@ class GoalInterfaceTests(unittest.TestCase):
         self.assertIsNone(result.action_receipt["selected_capability"])
         self.assertEqual(result.action_receipt["execution_envelope"]["allowed_capabilities"], [])
 
-    def test_cloud_style_constructor_accepts_goal_without_local_pawprint(self) -> None:
+    def test_cloud_connection_requires_local_pawprint(self) -> None:
         pawly = Pawly(api_key="test-key", project_id="proj_123")
 
         result = pawly.achieve(objective="Resolve a customer issue safely", context={"source": "first_connection"})
 
-        self.assertEqual(result.status, "accepted")
+        self.assertEqual(result.status, "configuration_required")
+        self.assertEqual(result.error, "missing_pawprint")
         self.assertEqual(result.action_receipt["interface"], "pawly.achieve")
         self.assertEqual(result.action_receipt["project_id"], "proj_123")
+        self.assertEqual(result.action_receipt["services"]["mode"], "cloud")
+        self.assertEqual(result.action_receipt["services"]["policy_backend"], "cloud")
+        self.assertEqual(result.action_receipt["cloud"]["mode"], "hosted_project")
         self.assertEqual(result.action_receipt["execution_envelope"]["resource_scope"], {"source": "first_connection"})
 
-    def test_hosted_goal_without_api_key_points_to_developer_console(self) -> None:
-        pawly = Pawly(project_id="proj_123")
+    def test_hosted_project_without_api_key_points_to_developer_console(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            registry = SkillRegistry()
+            registry.register("safe_reply", lambda args, context: {"reply": "handled"})
+            services = PawlyServices.cloud(project_id="proj_123")
+            pawly = Pawly(str(self._worker_path(tempdir)), services=services, skill_registry=registry)
 
-        result = pawly.achieve(objective="Resolve a customer issue safely")
+            result = pawly.achieve(objective="safe reply to the duplicate charge question")
 
         self.assertEqual(result.status, "configuration_required")
         self.assertEqual(result.error, "missing_api_key")
         self.assertIn("https://developer.aploy.ai/pawly", result.needs or "")
         self.assertEqual(result.action_receipt["project_id"], "proj_123")
+        self.assertEqual(result.action_receipt["services"]["mode"], "cloud")
+        self.assertFalse(result.action_receipt["cloud"]["api_key_configured"])
+
+    def test_cloud_connection_keeps_local_pawprint_execution_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            registry = SkillRegistry()
+            registry.register("safe_reply", lambda args, context: {"reply": "handled"})
+            services = PawlyServices.cloud(
+                project_id="proj_123",
+                api_key="test-key",
+                scoring_policy=HeuristicPolicy(),
+                sync_actions=False,
+            )
+            pawly = Pawly(str(self._worker_path(tempdir)), services=services, skill_registry=registry)
+
+            result = pawly.achieve(objective="safe reply to the duplicate charge question")
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.action_receipt["selected_capability"], "safe_reply")
+        self.assertEqual(result.action_receipt["services"]["mode"], "cloud")
+        self.assertEqual(result.action_receipt["cloud"]["project_id"], "proj_123")
+        self.assertTrue(result.action_receipt["cloud"]["api_key_configured"])
+
+    def test_local_services_can_write_action_records_to_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            audit_path = Path(tempdir) / "audit.jsonl"
+            registry = SkillRegistry()
+            registry.register("safe_reply", lambda args, context: {"reply": "handled"})
+            services = PawlyServices.local(scoring_policy=HeuristicPolicy(), audit_path=audit_path)
+            pawly = Pawly(str(self._worker_path(tempdir)), services=services, skill_registry=registry)
+
+            result = pawly.achieve(objective="safe reply to the duplicate charge question")
+
+            self.assertEqual(result.status, "completed")
+            self.assertTrue(audit_path.exists())
+            self.assertEqual(result.action_receipt["services"]["mode"], "local")
+            self.assertEqual(result.action_receipt["services"]["action_records"]["local_file"], str(audit_path))
 
 
 if __name__ == "__main__":
