@@ -218,11 +218,11 @@ class GoalInterfaceTests(unittest.TestCase):
         self.assertEqual(result.result["reply"], "safe reply to the duplicate charge question")
         self.assertEqual(result.action_receipt["skills"]["source"], "openai-tools")
 
-    def test_single_skill_can_be_registered_directly(self) -> None:
+    def test_local_skills_can_be_registered_as_a_mapping(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             pawly = Pawly(
                 str(self._worker_path(tempdir)),
-                skills=SkillService.single("safe_reply", lambda args, context: {"reply": args["objective"], "order": context.get("order_id")}),
+                skills=SkillService.local({"safe_reply": lambda args, context: {"reply": args["objective"], "order": context.get("order_id")}}),
                 policy=PolicyService.local(routing=HeuristicPolicy()),
             )
 

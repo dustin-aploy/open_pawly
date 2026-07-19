@@ -22,10 +22,6 @@ class SkillService:
     cloud_connection: CloudConnection | None = None
 
     @classmethod
-    def single(cls, name: str, handler: Callable[[dict[str, Any], dict[str, Any]], Any]) -> "SkillService":
-        return cls.local({name: handler})
-
-    @classmethod
     def local(cls, skills: Mapping[str, Callable[[dict[str, Any], dict[str, Any]], Any]] | None = None) -> "SkillService":
         registry = SkillRegistry()
         for name, handler in dict(skills or {}).items():

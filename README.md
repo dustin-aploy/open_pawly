@@ -161,8 +161,8 @@ project connection should all use the same schema version.
 
 ### 2. Register the skills Pawly is allowed to run
 
-Start with one explicit skill. This is the clearest way to prove the boundary,
-policy, and receipt flow before connecting a larger toolset.
+Start with an explicit local skill map. A map works for one skill or many, so the
+same shape can grow with your agent.
 
 ```python
 from pawly import HeuristicPolicy, Pawly, PolicyService, SkillService
@@ -176,7 +176,7 @@ def safe_reply(args, context):
 
 pawly = Pawly(
     "./worker.yaml",
-    skills=SkillService.single("safe_reply", safe_reply),
+    skills=SkillService.local({"safe_reply": safe_reply}),
     policy=PolicyService.local(routing=HeuristicPolicy()),
 )
 ```
