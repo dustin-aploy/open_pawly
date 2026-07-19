@@ -262,6 +262,21 @@ cloud_and_file = Pawly(
 )
 ```
 
+Cloud skills added from the dashboard:
+
+```python
+cloud_skills = Pawly(
+    "./worker.yaml",
+    # Search and add marketplace skills in the dashboard, then call them by id.
+    skills=SkillService.cloud(
+        api_key=os.getenv("PAWLY_API_KEY"),
+        skill_ids=["safe_reply", "summarize_ticket"],
+    ),
+    policy=PolicyService.local(routing=HeuristicPolicy()),
+    audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY")),
+)
+```
+
 Hosted policy review:
 
 ```python
@@ -317,7 +332,7 @@ Think of the constructor as three replaceable pieces behind the same Pawprint:
 
 | Piece | Local mode | Hosted mode |
 | --- | --- | --- |
-| `skills` | Local callables or a `SkillRegistry` | Existing OpenAI/framework tools through adapters |
+| `skills` | Local callables, a `SkillRegistry`, or existing OpenAI/framework tools through adapters | Marketplace and protected skills added to the project in the dashboard |
 | `policy` | Rule-based review plus optional local routing | Hosted policy review when selected |
 | `audit` | JSONL file or custom sink | Hosted dashboard sync, optionally also local JSONL |
 

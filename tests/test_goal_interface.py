@@ -218,6 +218,22 @@ class GoalInterfaceTests(unittest.TestCase):
         self.assertEqual(result.result["reply"], "safe reply to the duplicate charge question")
         self.assertEqual(result.action_receipt["skills"]["source"], "openai-tools")
 
+    def test_cloud_skills_without_api_key_return_configuration_step(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            pawly = Pawly(
+                str(self._worker_path(tempdir)),
+                skills=SkillService.cloud(skill_ids=["safe_reply"]),
+                policy=PolicyService.local(routing=HeuristicPolicy()),
+            )
+
+            result = pawly.achieve(objective="safe reply to the duplicate charge question")
+
+        self.assertEqual(result.status, "configuration_required")
+        self.assertEqual(result.error, "missing_api_key")
+        self.assertEqual(result.action_receipt["missing_service"], "skills")
+        self.assertEqual(result.action_receipt["skills"]["source"], "cloud-skills")
+        self.assertEqual(result.action_receipt["skills"]["alerts"][0]["code"], "missing_api_key")
+
 
 if __name__ == "__main__":
     unittest.main()

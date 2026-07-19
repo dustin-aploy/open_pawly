@@ -90,8 +90,8 @@ class Pawly:
                     constraints=constraints,
                 ),
             )
-        if not self.policy.is_configured() or not self.audit.is_configured():
-            missing = "policy" if not self.policy.is_configured() else "audit"
+        if (self.skills is not None and not self.skills.is_configured()) or not self.policy.is_configured() or not self.audit.is_configured():
+            missing = "skills" if self.skills is not None and not self.skills.is_configured() else "policy" if not self.policy.is_configured() else "audit"
             return GoalExecutionResult(
                 status="configuration_required",
                 objective=cleaned_objective,
