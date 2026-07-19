@@ -46,8 +46,6 @@ class SkillService:
             registry.register(str(skill_id), client.handler(str(skill_id)))
         return cls(registry=registry, source="cloud-skills", cloud_connection=connection)
 
-    hosted = cloud
-
     @classmethod
     def from_openai_tools(
         cls,
