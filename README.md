@@ -161,20 +161,12 @@ project connection should all use the same schema version.
 
 ### 2. Register the skills Pawly is allowed to run
 
-Most teams keep tool code in a `skills/` folder. Point Pawly at that folder and
-it will import Python files that export `skill`, `skills`, `tool`, `tools`,
-`handler`, `executor`, `run`, or `call`.
-
-Example folder:
-
-```text
-skills/
-  support.py
-  billing.py
-```
+Start with one explicit skill. This is the clearest way to prove the boundary,
+policy, and receipt flow before connecting a larger toolset.
 
 ```python
-# skills/support.py
+from pawly import HeuristicPolicy, Pawly, PolicyService, SkillService
+
 def safe_reply(args, context):
     return {
         "message": "We checked your order and will follow up safely.",
@@ -182,17 +174,9 @@ def safe_reply(args, context):
         "order_id": context.get("order_id"),
     }
 
-skills = {"safe_reply": safe_reply}
-```
-
-Connect the folder:
-
-```python
-from pawly import HeuristicPolicy, Pawly, PolicyService, SkillService
-
 pawly = Pawly(
     "./worker.yaml",
-    skills=SkillService.from_directory("./skills"),
+    skills=SkillService.single("safe_reply", safe_reply),
     policy=PolicyService.local(routing=HeuristicPolicy()),
 )
 ```
@@ -221,7 +205,39 @@ If the objective matches a registered skill and the policy allows it, Pawly runs
 the skill. If the objective needs review or is blocked, the receipt tells you
 which boundary stopped it.
 
-### 4. Choose policy, audit, and cloud skills
+### 4. Batch-register a skills folder
+
+After the first skill works, move your real tool code into a folder and import
+that folder. Open Pawly only auto-loads folders that follow the Pawly Python
+export shape; arbitrary framework folders should use an adapter.
+
+Example folder:
+
+```text
+skills/
+  support.py
+  billing.py
+```
+
+```python
+# skills/support.py
+def safe_reply(args, context):
+    return {"message": "Handled safely.", "order_id": context.get("order_id")}
+
+skills = {"safe_reply": safe_reply}
+```
+
+```python
+from pawly import HeuristicPolicy, Pawly, PolicyService, SkillService
+
+pawly = Pawly(
+    "./worker.yaml",
+    skills=SkillService.from_directory("./skills"),
+    policy=PolicyService.local(routing=HeuristicPolicy()),
+)
+```
+
+### 5. Choose policy, audit, and cloud skills
 
 Open Pawly and Pawly Cloud use the same constructor shape. Your Pawprint stays
 the source of capabilities and boundaries. `PolicyService` decides how a run is
@@ -320,11 +336,26 @@ to decide between similarly named policy hooks. If cloud policy is unavailable
 for the current key or environment, the receipt includes a dashboard entry and
 the local development path remains usable.
 
-### 5. Batch-import existing framework tools
+### 6. Import existing framework folders
 
-If your existing framework already builds tool objects in code, you can still
-register those directly. This is useful when your tools are not stored as files
-yet.
+Different frameworks store tools and skills differently, so Open Pawly only
+auto-loads known folder shapes. Use an adapter when the folder follows another
+framework's conventions.
+
+OpenAI-style Python folder:
+
+```python
+skills = SkillService.from_directory("./openai_tools", adapter="openai")
+```
+
+Claude-style Python folder:
+
+```python
+skills = SkillService.from_directory("./claude_skills", adapter="claude")
+```
+
+If your framework already builds tool objects in code, register those objects
+directly instead of reading a folder:
 
 ```python
 from pawly import AuditService, Pawly, PolicyService, SkillService

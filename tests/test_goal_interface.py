@@ -218,6 +218,20 @@ class GoalInterfaceTests(unittest.TestCase):
         self.assertEqual(result.result["reply"], "safe reply to the duplicate charge question")
         self.assertEqual(result.action_receipt["skills"]["source"], "openai-tools")
 
+    def test_single_skill_can_be_registered_directly(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            pawly = Pawly(
+                str(self._worker_path(tempdir)),
+                skills=SkillService.single("safe_reply", lambda args, context: {"reply": args["objective"], "order": context.get("order_id")}),
+                policy=PolicyService.local(routing=HeuristicPolicy()),
+            )
+
+            result = pawly.achieve(objective="safe reply to the duplicate charge question", context={"order_id": "123"})
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.result["order"], "123")
+        self.assertEqual(result.action_receipt["skills"]["source"], "local")
+
     def test_skills_can_be_loaded_from_a_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             skills_dir = Path(tempdir) / "skills"
@@ -242,6 +256,54 @@ skills = {"safe_reply": safe_reply}
         self.assertEqual(result.status, "completed")
         self.assertEqual(result.result["order"], "123")
         self.assertEqual(result.action_receipt["skills"]["source"], "directory")
+
+    def test_openai_skill_directory_can_be_loaded_with_adapter(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            skills_dir = Path(tempdir) / "openai_skills"
+            skills_dir.mkdir()
+            (skills_dir / "support.py").write_text(
+                """
+def reply(payload):
+    return {"reply": payload["objective"]}
+
+openai_tools = [{"tool_name": "safe_reply", "executor": reply}]
+""",
+                encoding="utf-8",
+            )
+            pawly = Pawly(
+                str(self._worker_path(tempdir)),
+                skills=SkillService.from_directory(skills_dir, adapter="openai"),
+                policy=PolicyService.local(routing=HeuristicPolicy()),
+            )
+
+            result = pawly.achieve(objective="safe reply to the duplicate charge question")
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.action_receipt["skills"]["source"], "openai-directory")
+
+    def test_claude_skill_directory_can_be_loaded_with_adapter(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            skills_dir = Path(tempdir) / "claude_skills"
+            skills_dir.mkdir()
+            (skills_dir / "support.py").write_text(
+                """
+def reply(args, context):
+    return {"reply": args["objective"]}
+
+claude_skills = [{"skill_name": "safe_reply", "executor": reply}]
+""",
+                encoding="utf-8",
+            )
+            pawly = Pawly(
+                str(self._worker_path(tempdir)),
+                skills=SkillService.from_directory(skills_dir, adapter="claude"),
+                policy=PolicyService.local(routing=HeuristicPolicy()),
+            )
+
+            result = pawly.achieve(objective="safe reply to the duplicate charge question")
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.action_receipt["skills"]["source"], "claude-directory")
 
     def test_cloud_skills_without_api_key_return_configuration_step(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

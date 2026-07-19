@@ -22,6 +22,10 @@ class SkillService:
     cloud_connection: CloudConnection | None = None
 
     @classmethod
+    def single(cls, name: str, handler: Callable[[dict[str, Any], dict[str, Any]], Any]) -> "SkillService":
+        return cls.local({name: handler})
+
+    @classmethod
     def local(cls, skills: Mapping[str, Callable[[dict[str, Any], dict[str, Any]], Any]] | None = None) -> "SkillService":
         registry = SkillRegistry()
         for name, handler in dict(skills or {}).items():
@@ -38,6 +42,7 @@ class SkillService:
         *,
         api_key: str | None = None,
         directory: str | Path | None = None,
+        adapter: str = "python",
         skills: Mapping[str, Callable[[dict[str, Any], dict[str, Any]], Any]] | Sequence[Any] | None = None,
         api_url: str = DEFAULT_CLOUD_API_URL,
         console_url: str = DEFAULT_CLOUD_CONSOLE_URL,
@@ -45,7 +50,7 @@ class SkillService:
         connection = CloudConnection(api_key=api_key, api_url=api_url, console_url=console_url)
         client = CloudSkillClient(connection)
         registry = SkillRegistry()
-        for name in _skill_names(directory=directory, skills=skills):
+        for name in _skill_names(directory=directory, adapter=adapter, skills=skills):
             registry.register(name, client.handler(name))
         return cls(registry=registry, source="cloud-skills", cloud_connection=connection)
 
@@ -54,9 +59,13 @@ class SkillService:
         cls,
         directory: str | Path,
         *,
+        adapter: str = "python",
         recursive: bool = True,
     ) -> "SkillService":
-        return cls(registry=_registry_from_definitions(_load_skill_definitions(directory, recursive=recursive)), source="directory")
+        return cls(
+            registry=_registry_from_definitions(_load_skill_definitions(directory, adapter=adapter, recursive=recursive)),
+            source=f"{adapter}-directory" if adapter != "python" else "directory",
+        )
 
     @classmethod
     def from_openai_tools(
@@ -174,11 +183,12 @@ class CloudSkillClient:
 def _skill_names(
     *,
     directory: str | Path | None,
+    adapter: str,
     skills: Mapping[str, Callable[[dict[str, Any], dict[str, Any]], Any]] | Sequence[Any] | None,
 ) -> list[str]:
     names: list[str] = []
     if directory is not None:
-        names.extend(_registry_from_definitions(_load_skill_definitions(directory)).action_names())
+        names.extend(_registry_from_definitions(_load_skill_definitions(directory, adapter=adapter)).action_names())
     if isinstance(skills, Mapping):
         names.extend(str(name).strip() for name in skills)
     elif skills is not None:
@@ -186,7 +196,10 @@ def _skill_names(
     return sorted({name for name in names if name})
 
 
-def _load_skill_definitions(directory: str | Path, *, recursive: bool = True) -> list[Any]:
+def _load_skill_definitions(directory: str | Path, *, adapter: str = "python", recursive: bool = True) -> list[Any]:
+    adapter = str(adapter or "python").strip().lower()
+    if adapter not in {"python", "openai", "claude"}:
+        raise ValueError("adapter must be one of: python, openai, claude")
     root = Path(directory)
     if not root.exists() or not root.is_dir():
         raise FileNotFoundError(f"skills directory not found: {root}")
@@ -210,6 +223,16 @@ def _load_skill_definitions(directory: str | Path, *, recursive: bool = True) ->
             value = getattr(module, field_name, None)
             if value is not None:
                 definitions.append(value)
+        if adapter == "openai":
+            for field_name in ("openai_tool", "openai_tools"):
+                value = getattr(module, field_name, None)
+                if value is not None:
+                    definitions.extend(list(value) if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)) else [value])
+        if adapter == "claude":
+            for field_name in ("claude_skill", "claude_skills"):
+                value = getattr(module, field_name, None)
+                if value is not None:
+                    definitions.extend(list(value) if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)) else [value])
         for field_name in ("handler", "executor", "run", "call"):
             value = getattr(module, field_name, None)
             if callable(value):
@@ -238,9 +261,11 @@ def _registry_from_definitions(definitions: Sequence[Any]) -> SkillRegistry:
 
 def _skill_definition(definition: Any) -> tuple[str, Callable[[dict[str, Any], dict[str, Any]], Any]]:
     if callable(definition) and not isinstance(definition, Mapping):
-        name = getattr(definition, "tool_name", None) or getattr(definition, "name", None) or definition.__name__
+        name = getattr(definition, "tool_name", None) or getattr(definition, "skill_name", None) or getattr(definition, "name", None) or definition.__name__
         return str(name), _local_skill_handler(definition)
     name = _extract_tool_value(definition, "tool_name", required=False)
+    if name is None:
+        name = _extract_tool_value(definition, "skill_name", required=False)
     if name is None:
         name = _extract_tool_value(definition, "name", required=False)
     executor = _extract_tool_value(definition, "executor", required=False)
