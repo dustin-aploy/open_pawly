@@ -173,9 +173,13 @@ print(result.action_receipt)
 The receipt shows which capability was selected, which boundary applied, and
 what was recorded for audit.
 
-When the agent starts touching real users or real accounts, keep the same three
-service shape and connect the parts you want to run through Pawly Cloud. Get a
-free project API key from [Pawly Developer](https://developer.aploy.ai/pawly).
+At first, a local audit file is usually enough. Cloud becomes useful when the
+agent is no longer just your local experiment: teammates need to see what ran,
+customers ask why an action happened, approvals need a shared place to live, or
+you want to add managed skills without maintaining another tool integration.
+Keep the same three service shape and connect only the parts you want to run
+through Pawly Cloud. Get a free project API key from
+[Pawly Developer](https://developer.aploy.ai/pawly).
 
 ```bash
 export PAWLY_API_KEY="paste_the_project_key"
@@ -192,9 +196,10 @@ policy = PolicyService.cloud(api_key=api_key)
 audit = AuditService.cloud(api_key=api_key, local_path="./pawly-audit.jsonl")
 ```
 
-That setup still has a local audit file, while the same run can appear in the
-project timeline. If the key is missing, Pawly returns a configuration step with
-the console link instead of an unclear runtime failure.
+That setup still keeps a local audit file, while the same run can appear in the
+project timeline for search, review, and handoff. If the key is missing, Pawly
+returns a configuration step with the console link instead of an unclear runtime
+failure.
 
 ### 3. Connect existing skills
 
@@ -234,9 +239,9 @@ If your framework already creates tool objects in code, pass those directly:
 skills=SkillService.from_openai_tools(openai_tools)
 ```
 
-Cloud uses the same `SkillService` slot. Use it when you want the project to
-call skills selected or managed from the dashboard, or when you want to sync a
-known local folder through an adapter:
+Cloud uses the same `SkillService` slot. Use it when a skill should be selected,
+tested, or managed from the dashboard, or when an existing local skills folder
+should be brought into that workflow through an adapter:
 
 ```python
 skills=SkillService.cloud(
@@ -365,6 +370,29 @@ Issues and pull requests are welcome. For code changes, include focused tests an
 keep cloud-service behavior out of the Open Pawly runtime. If a change affects
 the Pawprint contract, update the sibling `pawprint` package and relevant docs
 in the same patch.
+
+## Source Layout
+
+Open Pawly is split by runtime responsibility, not by product surface:
+
+```text
+src/pawly/
+  goal.py             goal-oriented Pawly(...).achieve(...) facade
+  services/           public SkillService, PolicyService, and AuditService wiring
+  runtime*.py         local decision, execution, receipts, and fallback behavior
+  policy*/            local Pawprint policy checks and action scoring
+  skill_registry.py   local skill registration and dispatch
+  audit/              local audit ledger and replay helpers
+  approval/           local approval queue and approval result helpers
+  gateway/            wrappers for existing tool executors
+  adapters/           OpenAI, Claude, LangGraph, CrewAI, OpenClaw, and HTTP adapters
+```
+
+Support packages such as `memory`, `middleware`, `performance`, and
+`escalation` are small runtime helpers used by the decision engine. They are not
+separate platform products. Generated folders such as `__pycache__`,
+`.pytest_cache`, `dist`, and `*.egg-info` are ignored and should not be synced to
+GitHub.
 
 ## Repository Layout
 
