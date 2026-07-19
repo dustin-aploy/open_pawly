@@ -165,21 +165,21 @@ Pawly only executes skills you register. This keeps prompt output separate from
 real system actions.
 
 ```python
-from pawly import HeuristicPolicy, Pawly, SkillRegistry
+from pawly import HeuristicPolicy, Pawly, PolicyService, SkillService
 
-# The local path uses your Pawprint file and deterministic policy checks.
-pawly = Pawly("./worker.yaml", scoring_policy=HeuristicPolicy())
-
-skills = SkillRegistry()
-skills.register(
-    "safe_reply",
-    lambda args, context: {
+skills = SkillService.local({
+    "safe_reply": lambda args, context: {
         "message": "We checked your order and will follow up safely.",
         "objective": args["objective"],
         "order_id": context.get("order_id"),
     },
+})
+
+pawly = Pawly(
+    "./worker.yaml",
+    skills=skills,
+    policy=PolicyService.local(routing=HeuristicPolicy()),
 )
-pawly.register_skills(skills)
 ```
 
 ### 3. Delegate a goal and inspect the receipt
@@ -203,31 +203,28 @@ If the objective matches a registered skill and the policy allows it, Pawly runs
 the skill. If the objective needs review or is blocked, the receipt tells you
 which boundary stopped it.
 
-### 4. Choose where policy and action records run
+### 4. Choose policy and audit services
 
 Open Pawly and hosted Pawly use the same constructor shape. Your Pawprint stays
-the source of capabilities and boundaries; services decide where policy review
-runs and where action records are written. A hosted key is unique on its own, so
-you do not need to pass a project id.
+the source of capabilities and boundaries. `PolicyService` decides how a run is
+reviewed and routed. `AuditService` decides where action records go. A hosted
+key already identifies the project.
 
 ```bash
 # Paste the one-time hosted key from the web console.
 export PAWLY_API_KEY="paste_the_project_key"
 ```
 
-Local file only:
+Local policy and local audit:
 
 ```python
-from pawly import HeuristicPolicy, Pawly, PawlyServices
+from pawly import AuditService, HeuristicPolicy, Pawly, PolicyService
 
 local = Pawly(
     "./worker.yaml",
-    skill_registry=skills,
-    services=PawlyServices.local(
-        policy="rules",
-        scoring_policy=HeuristicPolicy(),
-        audit_path="./pawly-audit.jsonl",
-    ),
+    skills=skills,
+    policy=PolicyService.local(routing=HeuristicPolicy()),
+    audit=AuditService.local("./pawly-audit.jsonl"),
 )
 ```
 
@@ -235,22 +232,20 @@ Cloud audit, local policy:
 
 ```python
 import os
-from pawly import HeuristicPolicy, Pawly, PawlyServices
+from pawly import AuditService, HeuristicPolicy, Pawly, PolicyService
 
 cloud_audit = Pawly(
     "./worker.yaml",
-    skill_registry=skills,
-    services=PawlyServices.cloud_audit(
-        api_key=os.getenv("PAWLY_API_KEY"),
-        scoring_policy=HeuristicPolicy(),
-    ),
+    skills=skills,
+    policy=PolicyService.local(routing=HeuristicPolicy()),
+    audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY")),
 )
 
 result = cloud_audit.achieve(
     objective="safe reply to the duplicate charge question",
     context={"order_id": "123"},
 )
-print(result.action_receipt["services"]["alerts"])
+print(result.action_receipt["audit"]["alerts"])
 ```
 
 Cloud audit plus local audit file:
@@ -258,73 +253,73 @@ Cloud audit plus local audit file:
 ```python
 cloud_and_file = Pawly(
     "./worker.yaml",
-    skill_registry=skills,
-    services=PawlyServices.cloud_audit(
+    skills=skills,
+    policy=PolicyService.local(routing=HeuristicPolicy()),
+    audit=AuditService.cloud(
         api_key=os.getenv("PAWLY_API_KEY"),
-        scoring_policy=HeuristicPolicy(),
-        local_audit_path="./pawly-audit.jsonl",
+        local_path="./pawly-audit.jsonl",
     ),
 )
 ```
 
-Cloud policy review:
+Hosted policy review:
 
 ```python
 cloud_policy = Pawly(
     "./worker.yaml",
-    skill_registry=skills,
-    services=PawlyServices.cloud_policy(
+    skills=skills,
+    policy=PolicyService.cloud(
         api_key=os.getenv("PAWLY_API_KEY"),
-        scoring_policy=HeuristicPolicy(),
+        routing=HeuristicPolicy(),
     ),
+    audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY")),
 )
 ```
 
-If cloud policy is not available for the current key or environment, Open Pawly
-keeps the local policy path available during development and includes a dashboard
-entry in the receipt alerts.
+The public API intentionally uses one `PolicyService`. Internally, Open Pawly
+bridges that service to boundary review and action routing, so you do not need
+to decide between similarly named policy hooks. If hosted policy is unavailable
+for the current key or environment, the receipt includes a dashboard entry and
+the local development path remains usable.
 
-### 5. Batch-wrap skills you already have
+### 5. Batch-wrap existing OpenAI tools
 
-You do not need to rewrite existing application code. Register small wrappers
-around the services your agent already calls.
+You do not need to rewrite tools your agent already uses. If you already have
+OpenAI-style tools with a name and executor, register them as a `SkillService`
+and keep your existing executor code.
 
 ```python
-from pawly import Pawly, PawlyServices, SkillRegistry
+from pawly import AuditService, Pawly, PolicyService, SkillService
 
-class SupportActions:
-    def safe_reply(self, args, context):
-        return ticket_system.reply(
-            ticket_id=context["ticket_id"],
-            body=f"We checked this safely: {args['objective']}",
-        )
-
-    def summarize_ticket(self, args, context):
-        return ticket_system.summarize(context["ticket_id"])
-
-existing = SupportActions()
-skills = SkillRegistry()
-
-for name, handler in {
-    "safe_reply": existing.safe_reply,
-    "summarize_ticket": existing.summarize_ticket,
-}.items():
-    skills.register(name, handler)
+openai_tools = [
+    {
+        "tool_name": "safe_reply",
+        "executor": lambda payload: ticket_system.reply(
+            ticket_id=payload["payload"]["ticket_id"],
+            body=f"We checked this safely: {payload['payload']['objective']}",
+        ),
+    },
+    {
+        "tool_name": "summarize_ticket",
+        "executor": lambda payload: ticket_system.summarize(payload["payload"]["ticket_id"]),
+    },
+]
 
 pawly = Pawly(
     "./worker.yaml",
-    skill_registry=skills,
-    services=PawlyServices.cloud_audit(api_key=os.getenv("PAWLY_API_KEY")),
+    skills=SkillService.from_openai_tools(openai_tools),
+    policy=PolicyService.local(),
+    audit=AuditService.cloud(api_key=os.getenv("PAWLY_API_KEY")),
 )
 ```
 
-Think of `PawlyServices` as the service wiring behind the same Pawprint:
+Think of the constructor as three replaceable pieces behind the same Pawprint:
 
-| Service | Local mode | Cloud mode |
+| Piece | Local mode | Hosted mode |
 | --- | --- | --- |
-| Policy review | Rule-based Pawprint evaluation or your own reviewer backend | Hosted policy reviewer when selected, with local development fallback |
-| Action routing | Local `Policy` such as `HeuristicPolicy` or your custom policy | Cloud scoring policy when provided, or the same local policy |
-| Action records | Local JSONL audit file or custom audit sink | Hosted action sync for dashboard visibility, optionally also local JSONL |
+| `skills` | Local callables or a `SkillRegistry` | Existing OpenAI/framework tools through adapters |
+| `policy` | Rule-based review plus optional local routing | Hosted policy review when selected |
+| `audit` | JSONL file or custom sink | Hosted dashboard sync, optionally also local JSONL |
 
 When `PAWLY_API_KEY` is missing, Pawly returns a configuration-required result
 with a link to the developer console instead of failing with an unclear error.

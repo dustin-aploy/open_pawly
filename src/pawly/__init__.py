@@ -63,7 +63,7 @@ from .backends import (
 )
 from .decision_engine import ActionCandidate, ActionDecision, DecisionEngine
 from .gateway import ExecutionGateway, GatewayProtocol, wrap_execute_fn, wrap_executor, wrap_framework_adapter
-from .goal import CloudConnection, GoalExecutionResult, Pawly, PawlyServices
+from .goal import GoalExecutionResult, Pawly
 from .loader.yaml_loader import load_yaml_file
 from .pawprint_loader import (
     PROTECTED_SKILL_WARNING,
@@ -83,6 +83,7 @@ from .protected_oss import ProtectedAuditRedactingSink, detect_extraction_attemp
 from .runtime import PawlyRuntime
 from .runtime_result import RuntimeDecisionResult
 from .skill_registry import MissingSkillRegistryError, SkillRegistry
+from .services import AuditService, CloudConnection, PolicyService, SkillService
 from .contracts import Action, Decision, DecisionState, Intent, IntentSource, PolicyScore
 
 __all__ = [
@@ -98,6 +99,7 @@ __all__ = [
     "ActionCandidate",
     "ActionDecision",
     "AuditSink",
+    "AuditService",
     "CloudReviewer",
     "CloudConnection",
     "CallbackApprovalNotifier",
@@ -136,7 +138,7 @@ __all__ = [
     "PolicyScore",
     "PawlyRuntime",
     "Pawly",
-    "PawlyServices",
+    "PolicyService",
     "ProtectedAuditRedactingSink",
     "ReviewerPolicy",
     "ReviewerBackend",
@@ -155,6 +157,7 @@ __all__ = [
     "SelfHostedWorkerConfig",
     "StaticApprovalHandler",
     "SkillRegistry",
+    "SkillService",
     "PROTECTED_SKILL_WARNING",
     "build_model_visible_skill_context",
     "build_default_audit_sink",
