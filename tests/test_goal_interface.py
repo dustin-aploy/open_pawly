@@ -154,9 +154,11 @@ class GoalInterfaceTests(unittest.TestCase):
         self.assertTrue(result.action_receipt["audit"]["cloud"]["api_key_configured"])
 
     def test_cloud_policy_is_explicit_service_choice(self) -> None:
-        policy = PolicyService.cloud(api_key="test-key", routing=HeuristicPolicy())
+        policy = PolicyService.cloud(api_key="test-key")
 
         self.assertEqual(policy.reviewer, "cloud")
+        self.assertNotIn("scoring_policy", policy.to_engine_kwargs())
+        self.assertNotIn("routing", policy.to_dict())
         self.assertIn("cloud_policy_selected", {alert["code"] for alert in policy.alerts()})
 
     def test_local_audit_service_can_write_action_records_to_file(self) -> None:

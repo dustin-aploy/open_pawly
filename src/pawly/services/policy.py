@@ -35,13 +35,11 @@ class PolicyService:
         cls,
         *,
         api_key: str | None = None,
-        routing: Policy | str | None = None,
         api_url: str = DEFAULT_CLOUD_API_URL,
         console_url: str = DEFAULT_CLOUD_CONSOLE_URL,
     ) -> "PolicyService":
         return cls(
             reviewer="cloud",
-            routing=routing,
             cloud_connection=CloudConnection(api_key=api_key, api_url=api_url, console_url=console_url),
         )
 

@@ -188,7 +188,7 @@ from pawly import AuditService, HeuristicPolicy, PolicyService, SkillService
 api_key = os.getenv("PAWLY_API_KEY")
 
 skills = SkillService.local({"safe_reply": safe_reply})
-policy = PolicyService.cloud(api_key=api_key, routing=HeuristicPolicy())
+policy = PolicyService.cloud(api_key=api_key)
 audit = AuditService.cloud(api_key=api_key, local_path="./pawly-audit.jsonl")
 ```
 
