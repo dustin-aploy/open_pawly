@@ -109,28 +109,30 @@ class Pawly:
         if self.engine.skill_registry is None:
             raise MissingSkillRegistryError("achieve requires skills. Pass skills=... or call register_skills(...).")
 
-        action = _resolve_objective_to_action(cleaned_objective, self.engine.skill_registry)
-        if action is None:
+        selected_pawprint = pawprint_config or self.engine.pawprint_config
+        actions = _build_goal_candidate_actions(cleaned_objective, self.engine.skill_registry, selected_pawprint)
+        if not actions:
             return GoalExecutionResult(
                 status="unsupported_goal",
                 objective=cleaned_objective,
-                needs="Register a skill whose capability matches this objective.",
+                needs="Build the objective from the agent's Pawprint capability names or descriptions, or register a matching skill.",
                 action_receipt=self._receipt(
                     objective=cleaned_objective,
                     status="unsupported_goal",
                     selected_action=None,
                     context=context,
                     constraints=constraints,
+                    extra={"available_capabilities": self.engine.skill_registry.action_names()},
                 ),
             )
 
-        run_result = self.engine.run_actions(
+        run_result = self._run_goal_candidate_actions(
             state={
                 "objective": cleaned_objective,
                 "goal_interface": "achieve",
                 "constraints": dict(constraints or {}),
             },
-            actions=[action],
+            actions=actions,
             context={
                 **dict(context or {}),
                 "objective": cleaned_objective,
@@ -139,6 +141,7 @@ class Pawly:
             pawprint_config=pawprint_config,
         )
         status = str(run_result.get("status", "failed"))
+        selected_action = _selected_action_from_run_result(run_result)
         return GoalExecutionResult(
             status=status,
             objective=cleaned_objective,
@@ -148,11 +151,30 @@ class Pawly:
             action_receipt=self._receipt(
                 objective=cleaned_objective,
                 status=status,
-                selected_action=action,
+                selected_action=selected_action,
                 context=context,
                 constraints=constraints,
                 run_result=run_result,
             ),
+        )
+
+    def _run_goal_candidate_actions(
+        self,
+        *,
+        state: Mapping[str, Any] | None,
+        actions: list[Action],
+        context: Mapping[str, Any] | None = None,
+        pawprint_config: PawprintConfig | None = None,
+    ) -> dict[str, Any]:
+        if self.engine is None:
+            raise MissingSkillRegistryError("achieve requires a Pawprint path such as Pawly('./worker.yaml').")
+        if self.engine.skill_registry is None:
+            raise MissingSkillRegistryError("achieve requires skills. Pass skills=... or call register_skills(...).")
+        return self.engine.run_actions(
+            state=state,
+            actions=actions,
+            context=context,
+            pawprint_config=pawprint_config,
         )
 
     def _engine_kwargs(self) -> dict[str, Any]:
@@ -223,21 +245,28 @@ def _resolve_skill_service(
     return SkillService.local(skills)
 
 
-def _resolve_objective_to_action(objective: str, skill_registry: SkillRegistry) -> Action | None:
+def _build_goal_candidate_actions(objective: str, skill_registry: SkillRegistry, pawprint: PawprintConfig | None = None) -> list[Action]:
     names = skill_registry.action_names()
     if not names:
-        return None
+        return []
     objective_tokens = _tokens(objective)
-    ranked = sorted(
-        names,
-        key=lambda name: (_overlap_score(objective_tokens, _tokens(name)), -len(name)),
-        reverse=True,
-    )
-    selected = ranked[0]
-    selected_score = _overlap_score(objective_tokens, _tokens(selected))
-    if selected_score == 0:
+    descriptions = {} if pawprint is None else dict(pawprint.capability_descriptions)
+    candidates: list[Action] = []
+    for name in names:
+        match_text = f"{name} {descriptions.get(name, '')}".strip()
+        if _overlap_score(objective_tokens, _tokens(match_text)) > 0:
+            candidates.append(Action(name=name, arguments={"objective": objective}))
+    return candidates
+
+
+def _selected_action_from_run_result(run_result: Mapping[str, Any]) -> Action | None:
+    decision = run_result.get("decision")
+    if not isinstance(decision, Mapping):
         return None
-    return Action(name=selected, arguments={"objective": objective})
+    selected = decision.get("selected_action")
+    if not isinstance(selected, Mapping):
+        return None
+    return Action.from_dict(dict(selected))
 
 
 def _tokens(value: str) -> set[str]:

@@ -98,48 +98,76 @@ package named `pawprint`.
 
 ## Quickstart
 
-### 1. Declare what the agent may do
+### 1. Define the agent boundary
 
-Create `worker.yaml` with the actions Pawly is allowed to consider. Keep the
-first version small: one safe action, one review-only action, and one action that
-should never run automatically.
+Start with the agent, not with a tool wrapper. Create
+`agents/support_agent.pawprint.yaml` to describe what this agent is allowed to
+do when it reaches the execution layer.
+
+Keep the first version small: one safe action, one review-only action, and one
+action that should never run automatically.
 
 ```yaml
-id: support-worker
-name: Support Worker
+metadata:
+  id: support-agent
+  name: Support Agent
+  description: Handles routine support requests and keeps risky actions behind review.
 
 capabilities:
-  - safe_reply
-  - issue_refund
+  - name: safe_reply
+    description: Send a low-risk customer reply that stays within approved guidance.
+  - name: lookup_order
+    description: Read order status for the current customer.
+  - name: issue_refund
+    description: Refund a customer account.
 
 boundaries:
-  auto:
+  allow:
     - safe_reply
-  ask_first:
+    - lookup_order
+  review:
     - issue_refund
-  never:
+  block:
     - delete_customer
-
-handoff:
-  to: support-lead
-  when:
-    - refund requested
 ```
 
 Validate it:
 
 ```bash
-python -m pawprint.validate ./worker.yaml
+python -m pawprint.validate ./agents/support_agent.pawprint.yaml
 ```
 
-### 2. Define services and run a goal
+### 2. Put Pawly on the execution path
 
-Register the functions Pawly may execute, choose the policy that decides whether
-they can run, and choose where receipts are written. The three services stay
-separate on purpose: replace one without changing the others.
+The main integration is goal-first execution. Your agent runtime keeps planning
+and conversation state, but it does not call production tools directly. Register
+the real functions behind Pawly, then have your runtime pass the user's goal to
+`pawly.achieve(...)`.
+
+This is the important boundary: Pawly is not an optional model tool. It is the
+only execution path your app calls when an agent wants to act.
+
+Create `support_agent.py`:
 
 ```python
+from typing import Any, NotRequired, TypedDict
+
 from pawly import AuditService, HeuristicPolicy, Pawly, PolicyService, SkillService
+
+
+class AgentPlan(TypedDict):
+    objective: str
+    context: dict[str, Any]
+    constraints: NotRequired[dict[str, Any]]
+
+
+def lookup_order(args, context):
+    return {
+        "order_id": context["order_id"],
+        "status": "paid",
+        "duplicate_charge": True,
+    }
+
 
 def safe_reply(args, context):
     return {
@@ -148,30 +176,103 @@ def safe_reply(args, context):
         "order_id": context.get("order_id"),
     }
 
-skills = SkillService.local({"safe_reply": safe_reply})
-policy = PolicyService.local(routing=HeuristicPolicy())
-audit = AuditService.local("./pawly-audit.jsonl")
+
+def issue_refund(args, context):
+    return {
+        "status": "queued_for_refund",
+        "order_id": context["order_id"],
+    }
+
 
 pawly = Pawly(
-    "./worker.yaml",
-    skills=skills,
-    policy=policy,
-    audit=audit,
+    "./agents/support_agent.pawprint.yaml",
+    skills=SkillService.local(
+        {
+            "lookup_order": lookup_order,
+            "safe_reply": safe_reply,
+            "issue_refund": issue_refund,
+        }
+    ),
+    policy=PolicyService.local(routing=HeuristicPolicy()),
+    audit=AuditService.local("./pawly-audit.jsonl"),
 )
 
-result = pawly.achieve(
-    objective="safe reply to the duplicate charge question",
-    context={"order_id": "123", "channel": "chat"},
-    constraints={"max_cost": 2},
+
+class SupportAgentRuntime:
+    """The agent owns conversation/planning; Pawly owns execution."""
+
+    def plan(self, user_message, *, order_id, customer_id) -> AgentPlan:
+        # In production, this method is usually your framework's structured
+        # output call. Keep the same contract: objective, context, constraints.
+        normalized = user_message.lower()
+        if "refund" in normalized or "charged" in normalized:
+            objective = (
+                "safe_reply about a billing question; "
+                f"do not issue_refund automatically: {user_message}"
+            )
+            constraints = {"max_refund": 0}
+        elif "order" in normalized:
+            objective = f"lookup_order and safe_reply for this customer request: {user_message}"
+            constraints = {}
+        else:
+            objective = f"safe_reply for this support request: {user_message}"
+            constraints = {}
+        return {
+            "objective": objective,
+            "context": {
+                "order_id": order_id,
+                "customer_id": customer_id,
+                "channel": "chat",
+            },
+            "constraints": constraints,
+        }
+
+
+agent_runtime = SupportAgentRuntime()
+plan = agent_runtime.plan(
+    "I was charged twice. Can you refund me?",
+    order_id="ord_123",
+    customer_id="cus_123",
 )
+result = pawly.achieve(**plan)
 
 print(result.status)
 print(result.result)
 print(result.action_receipt)
 ```
 
-The receipt shows which capability was selected, which boundary applied, and
-what was recorded for audit.
+Pawly builds the candidate actions from registered skills, applies the Pawprint
+boundaries, scores the eligible actions, executes the selected skill, and returns
+a receipt. The receipt shows which capability was selected, which boundary
+applied, and what was recorded for audit.
+
+The agent runtime can still use an LLM to understand the conversation and
+produce the structured plan. The production credentials stay behind the
+registered skill functions, and application code calls `pawly.achieve(...)`
+instead of exposing those functions as unguarded model tools.
+
+In an agent framework with structured output, the runtime output is just the
+`AgentPlan` shape above. Pass it directly into `pawly.achieve(**plan)` as long as
+it contains `objective`, `context`, and optional `constraints`. If the workflow
+is deterministic business logic, use the same shape from normal code; Pawly does
+not require an LLM.
+
+For Open Pawly local routing, the objective must use the agent's Pawprint
+capability language: names such as `safe_reply` or terms from the capability
+description such as `read order status`. If the objective is only raw user text,
+Pawly may return `unsupported_goal` because it cannot build a safe candidate
+set. This is intentional: the runtime should fail closed rather than guess which
+production action to run.
+
+The same flow is available as a runnable example:
+
+```bash
+python examples/goal_first_support_agent.py
+```
+
+That example starts from `examples/agents/goal_first_support_agent.yaml`, binds
+the agent's real skills, creates an agent-runtime plan, and routes the support
+message through `pawly.achieve`.
 
 At first, a local audit file is usually enough. Cloud becomes useful when the
 agent is no longer just your local experiment: teammates need to see what ran,
@@ -255,24 +356,18 @@ Marketplace skills are selected in the dashboard, so the SDK does not need a
 manual skill-id list. Local folders still require an explicit adapter because
 Pawly should read a known format instead of guessing.
 
-## Public API
+## Developer API
 
-The recommended integration surface is goal-oriented:
+The developer-facing integration surface is goal-first:
 
 ```python
 Pawly(...).achieve(objective=..., context=..., constraints=...)
 ```
 
-Lower-level APIs are available for adapters and migration work:
-
-| API | Use when |
-| --- | --- |
-| `achieve(...)` | You want the top-level helper around `Pawly(...).achieve(...)`. |
-| `DecisionEngine.run_actions(...)` | You already have explicit `Action` objects. |
-| `run_actions(...)` | You want the top-level explicit-action helper. |
-| `decide(...)` | You only need decision output, not execution. |
-| `run(...)` | You need the legacy task/action evaluation helper. |
-| `wrap_*` adapters | You are inserting Pawly into an existing tool executor. |
+Keep real external actions behind `SkillService`; do not expose the same
+credentials through unguarded tools. Lower-level candidate-action and executor
+wrapper APIs remain in the package for framework adapters, migration work, and
+runtime maintainers, but they are not the main developer integration path.
 
 ## Receipts
 
@@ -314,8 +409,9 @@ Agent runtime
 Pawly
     |-- Pawprint boundary
     |-- Skill registry
-    |-- Policy engine
-    |-- Execution gateway
+    |-- Candidate builder
+    |-- Policy routing
+    |-- Execution/audit receipt
     v
 Local skill executor
 ```
@@ -342,8 +438,6 @@ See [`src/pawly/adapters/README.md`](src/pawly/adapters/README.md) and
 ## Documentation
 
 - [Architecture](docs/architecture.md)
-- [Execution gateway](docs/execution_gateway.md)
-- [Run actions](docs/run_actions.md)
 - [Approval flow](docs/approval_flow.md)
 - [Audit and replay](docs/audit_and_replay.md)
 - [Pawprint policy engine](docs/pawprint_policy_engine.md)

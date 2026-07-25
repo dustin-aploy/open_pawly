@@ -115,6 +115,7 @@ class PawprintConfig:
     name: str
     description: str
     capabilities: list[str] = field(default_factory=list)
+    capability_descriptions: dict[str, str] = field(default_factory=dict)
     allowed_actions: list[str] = field(default_factory=list)
     review_actions: list[str] = field(default_factory=list)
     blocked_actions: list[str] = field(default_factory=list)
@@ -128,6 +129,7 @@ class PawprintConfig:
             "name": self.name,
             "description": self.description,
             "capabilities": list(self.capabilities),
+            "capability_descriptions": dict(self.capability_descriptions),
             "actions": {
                 "allowed": list(self.allowed_actions),
                 "requiring_review": list(self.review_actions),
@@ -190,6 +192,7 @@ def parse_pawprint_document(raw_document: dict[str, Any]) -> PawprintConfig:
         name=resolved_name,
         description=resolved_description,
         capabilities=_capability_names(capabilities),
+        capability_descriptions=_capability_descriptions(capabilities),
         allowed_actions=_string_list(boundaries.get("auto", boundaries.get("allow", []))),
         review_actions=_string_list(boundaries.get("ask_first", boundaries.get("review", []))),
         blocked_actions=_string_list(boundaries.get("never", boundaries.get("block", []))),
@@ -234,6 +237,20 @@ def _capability_names(value: Any) -> list[str]:
             if name:
                 names.append(name)
     return names
+
+
+def _capability_descriptions(value: Any) -> dict[str, str]:
+    if not isinstance(value, list):
+        return {}
+    descriptions: dict[str, str] = {}
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", "")).strip()
+        description = str(item.get("description", "")).strip()
+        if name and description:
+            descriptions[name] = description
+    return descriptions
 
 
 def _parse_skill_metadata(metadata: dict[str, Any], skill: dict[str, Any]) -> SkillMetadata | None:

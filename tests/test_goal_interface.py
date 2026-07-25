@@ -17,12 +17,18 @@ metadata:
 capabilities:
   - name: safe_reply
     description: Reply safely.
+  - name: lookup_order
+    description: Read order status for the current customer.
+  - name: reply_with_refund
+    description: Reply and mention refund next steps.
   - name: issue_refund
     description: Refund a customer.
 
 boundaries:
   allow:
     - safe_reply
+    - lookup_order
+    - reply_with_refund
   review: []
   block:
     - issue_refund
@@ -36,10 +42,14 @@ role: Support action runner
 summary: Worker for goal interface tests with safe replies and refund handoff.
 capabilities:
   - safe_reply
+  - lookup_order
+  - reply_with_refund
   - issue_refund
 boundaries:
   auto:
     - safe_reply
+    - lookup_order
+    - reply_with_refund
   ask_first: []
   never:
     - issue_refund
@@ -90,6 +100,24 @@ class GoalInterfaceTests(unittest.TestCase):
         self.assertEqual(result.action_receipt["execution_envelope"]["allowed_capabilities"], ["safe_reply"])
         self.assertEqual(result.action_receipt["execution_envelope"]["financial_limits"], {"max_cost": 2})
 
+    def test_achieve_routes_across_goal_candidate_skills(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            registry = SkillRegistry()
+            registry.register("safe_reply", lambda args, context: {"skill": "safe_reply", "objective": args["objective"]})
+            registry.register("reply_with_refund", lambda args, context: {"skill": "reply_with_refund", "objective": args["objective"]})
+            pawly = Pawly(
+                str(self._worker_path(tempdir)),
+                skills=SkillService.from_registry(registry),
+                policy=PolicyService.local(routing=HeuristicPolicy()),
+            )
+
+            result = pawly.achieve(objective="safe reply to the duplicate charge question")
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.action_receipt["selected_capability"], "safe_reply")
+        selected = result.decision["selected_action"] if result.decision is not None else None
+        self.assertEqual(selected["name"], "safe_reply")
+
     def test_top_level_achieve_returns_unsupported_goal_when_no_skill_matches(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             registry = SkillRegistry()
@@ -102,9 +130,28 @@ class GoalInterfaceTests(unittest.TestCase):
             )
 
         self.assertEqual(result.status, "unsupported_goal")
-        self.assertEqual(result.needs, "Register a skill whose capability matches this objective.")
+        self.assertEqual(result.needs, "Build the objective from the agent's Pawprint capability names or descriptions, or register a matching skill.")
         self.assertIsNone(result.action_receipt["selected_capability"])
         self.assertEqual(result.action_receipt["execution_envelope"]["allowed_capabilities"], [])
+        self.assertEqual(result.action_receipt["available_capabilities"], ["safe_reply"])
+
+    def test_achieve_can_match_capability_description_terms(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            registry = SkillRegistry()
+            registry.register("lookup_order", lambda args, context: {"order": context["order_id"], "objective": args["objective"]})
+            pawly = Pawly(
+                str(self._worker_path(tempdir)),
+                skills=SkillService.from_registry(registry),
+                policy=PolicyService.local(routing=HeuristicPolicy()),
+            )
+
+            result = pawly.achieve(
+                objective="read order status for this customer",
+                context={"order_id": "123"},
+            )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.action_receipt["selected_capability"], "lookup_order")
 
     def test_cloud_policy_requires_local_pawprint(self) -> None:
         pawly = Pawly(policy=PolicyService.cloud(api_key="test-key"))

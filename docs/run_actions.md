@@ -1,10 +1,16 @@
-# `run_actions(...)`
+# Internal: candidate-action routing
 
 In this document `pawly` means the open-source package published from `open_pawly`.
 
-Pawly now supports a one-call candidate-action path that keeps decision and selected-action execution inside `DecisionEngine`.
+Pawly supports a candidate-action path that keeps decision and selected-action
+execution inside `DecisionEngine`. This is primarily for framework adapters and
+runtime maintainers.
 
-## Recommended usage
+Most application developers should use `Pawly(...).achieve(...)`, where Pawly
+builds candidate actions from registered skills before calling this lower-level
+path internally.
+
+## Internal adapter usage
 
 ```python
 from pawly import DecisionEngine, HeuristicPolicy, SkillRegistry, load_pawprint_file
@@ -82,7 +88,7 @@ self.skills.register("send_external_message", self.send_external_message)
 self.pawly.register_skills(self.skills)
 ```
 
-`decide_actions(...)` still works for advanced or backward-compatible manual flows, but `run_actions(...)` is now the recommended path.
+`decide_actions(...)` still works for advanced or backward-compatible manual flows. For application code, prefer `Pawly(...).achieve(...)`.
 
 ## Shield configuration
 
@@ -155,7 +161,7 @@ decision = pawly.decide_actions(...)
 result = skills.execute(decision.selected_action, context)
 ```
 
-That remains useful for advanced control, but it is no longer the recommended default integration.
+That remains useful for advanced control, but it is not the recommended default integration.
 
 ## Future path
 

@@ -1,0 +1,21 @@
+metadata:
+  id: goal-first-support-agent
+  name: Goal-first Support Agent
+  description: Handles routine support requests through Pawly-owned execution.
+
+capabilities:
+  - name: safe_reply
+    description: Send a low-risk customer reply that stays within approved guidance.
+  - name: lookup_order
+    description: Read order status for the current customer.
+  - name: issue_refund
+    description: Refund a customer account after review.
+
+boundaries:
+  allow:
+    - safe_reply
+    - lookup_order
+  review:
+    - issue_refund
+  block:
+    - delete_customer

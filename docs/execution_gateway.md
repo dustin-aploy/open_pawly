@@ -1,12 +1,17 @@
-# Execution Gateway
+# Advanced: Execution Gateway
 
 In this document `pawly` means the open-source package published from `open_pawly`.
 
-The main Pawly integration model is executor wrapping.
+Executor wrapping is an advanced migration path.
 
 Pawly wraps execution.
 It does not replace planning.
 It does not replace the host agent runtime.
+It does not perform goal-first tool routing.
+
+Most application developers should start with `Pawly(...).achieve(...)` instead.
+Use this gateway only when an existing framework has already selected an action
+and you need Pawly to protect the final execution call.
 
 ## Core idea
 
@@ -26,7 +31,7 @@ If the decision is:
 - `require_approval`: execution pauses unless a local approval handler approves it
 - `simulate`: execution does not run
 
-## Main interfaces
+## Advanced interfaces
 
 The current Open Pawly gateway surface is:
 
@@ -34,7 +39,7 @@ The current Open Pawly gateway surface is:
 - `wrap_execute_fn(fn, pawprint, reviewer="rules")`
 - `ExecutionGateway`
 
-These wrappers hide branching from developer-facing code. The caller invokes the wrapped executor or execute function and receives the structured Pawly result back without writing manual `if/else` around decision types.
+These wrappers hide branching from migration code. The caller invokes the wrapped executor or execute function and receives the structured Pawly result back without writing manual `if/else` around decision types.
 
 ## Reviewer model
 
