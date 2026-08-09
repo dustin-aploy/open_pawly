@@ -1,13 +1,32 @@
-id: support-triage
-name: Support Triage
-role: Customer support triage assistant
-summary: Handles simple support triage and hands off billing, legal, or risky issues.
+# Support Triage: handles simple support triage and hands off billing, legal,
+# or risky issues to a human.
+metadata:
+  id: support-triage
+  name: Support Triage
+  description: Customer support triage assistant. Handles simple support triage and hands off billing, legal, or risky issues.
+
 capabilities:
-  - summarize support tickets
-  - classify common issues
-  - draft low-risk support replies
+  - name: summarize support tickets
+    description: Summarize the history and current state of a support ticket.
+  - name: classify common issues
+    description: Classify an inbound ticket into a known issue category.
+  - name: classify password reset tickets
+    description: Recognize and classify a password-reset request specifically.
+  - name: draft low-risk support replies
+    description: Draft a reply for a routine, low-risk support question.
+  - name: update billing details
+    description: Change a customer's stored billing information.
+  - name: issue refunds
+    description: Issue a refund on a customer's order or subscription.
+  - name: provide legal advice
+    description: Give the customer legal advice or guidance.
+  - name: close security incidents
+    description: Mark a security incident as resolved and closed.
+
 boundaries:
   allow:
+    - summarize support tickets
+    - classify common issues
     - classify password reset tickets
     - draft low-risk support replies
   review:
@@ -16,12 +35,3 @@ boundaries:
   block:
     - provide legal advice
     - close security incidents
-handoff:
-  to: support-lead
-  when:
-    - billing issue appears
-    - legal issue appears
-    - security issue appears
-style:
-  tone: calm and practical
-  format: brief support-ready drafts
