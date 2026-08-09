@@ -5,7 +5,7 @@ from typing import Any
 
 
 DEFAULT_CLOUD_CONSOLE_URL = "https://developer.aploy.ai/pawly"
-DEFAULT_CLOUD_API_URL = "https://api.aploy.ai"
+DEFAULT_CLOUD_API_URL = "https://api.aploy.ai/api"
 
 
 @dataclass(slots=True)

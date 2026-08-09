@@ -10,7 +10,7 @@ from pawly.audit.events import AuditEvent
 from pawly.audit.ledger import AuditLedger
 from pawly.loader.yaml_loader import load_yaml_file
 
-DEFAULT_PAWLY_CLOUD_BASE_URL = "https://api.pawly.dev"
+DEFAULT_PAWLY_CLOUD_BASE_URL = "https://api.aploy.ai/api"
 PAWLY_CLOUD_BASE_URL_ENV = "PAWLY_CLOUD_BASE_URL"
 PAWLY_AUTH_PATH_ENV = "PAWLY_AUTH_PATH"
 

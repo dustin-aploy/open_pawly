@@ -27,6 +27,14 @@ class HeuristicPolicyTests(unittest.TestCase):
         self.assertIn("low_friction_action", scores[0].reason_codes)
         self.assertIn("preferred_target", scores[0].reason_codes)
 
+    def test_prefers_explicit_policy_action_hint(self):
+        policy = HeuristicPolicy()
+        safe = Action(name="safe_reply", arguments={})
+        lookup = Action(name="lookup_order", arguments={})
+        scores = policy.evaluate({"preferred_actions": ["safe_reply"]}, [safe, lookup])
+        self.assertLess(scores[0].risk_score, scores[1].risk_score)
+        self.assertIn("preferred_action", scores[0].reason_codes)
+
     def test_is_deterministic_for_same_inputs(self):
         policy = HeuristicPolicy()
         state = {

@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any, NotRequired, TypedDict
 
-from pawly import AuditService, HeuristicPolicy, Pawly, PolicyService, SkillService
+from pawly import AuditService, Pawly, PolicyService, SkillService
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -77,7 +77,7 @@ def main() -> int:
                 "issue_refund": issue_refund,
             }
         ),
-        policy=PolicyService.local(routing=HeuristicPolicy()) if not api_key else PolicyService.cloud(api_key=api_key),
+        policy=PolicyService.local() if not api_key else PolicyService.cloud(api_key=api_key),
         audit=AuditService.local("./pawly-audit.jsonl")
         if not api_key
         else AuditService.cloud(api_key=api_key, local_path="./pawly-audit.jsonl"),
@@ -87,7 +87,7 @@ def main() -> int:
         order_id="ord_123",
         customer_id="cus_123",
     )
-    result = pawly.achieve(**plan)
+    result = pawly.achieve(**plan, user_id="user_123", session_id="sess_456")
     print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     return 0
 

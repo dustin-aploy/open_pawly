@@ -23,12 +23,14 @@ class HeuristicPolicy(Policy):
 
     def evaluate(self, state: Any, actions: Sequence[Action]) -> list[PolicyScore]:
         preferred_targets = _preferred_targets(state)
+        preferred_actions = _preferred_actions(state)
         recent_failures = _recent_failures(state)
         return tag_scores(
             [
                 _score_action(
                     action,
                     preferred_targets=preferred_targets,
+                    preferred_actions=preferred_actions,
                     recent_failures=recent_failures,
                 )
                 for action in actions
@@ -44,6 +46,7 @@ def _score_action(
     action: Action,
     *,
     preferred_targets: set[str],
+    preferred_actions: set[str],
     recent_failures: set[str],
 ) -> PolicyScore:
     score = 0.5
@@ -65,6 +68,11 @@ def _score_action(
         reason_codes.append("missing_target")
 
     normalized_name = action.name.strip().lower()
+    if normalized_name in preferred_actions:
+        score -= 0.18
+        reason_codes.append("preferred_action")
+        audit_tags.append(f"action:{normalized_name}")
+
     if normalized_name in recent_failures:
         score += 0.2
         reason_codes.append("recent_failure")
@@ -100,6 +108,15 @@ def _preferred_targets(state: Any) -> set[str]:
     if not isinstance(raw_targets, Sequence) or isinstance(raw_targets, (str, bytes)):
         return set()
     return {str(item).strip().lower() for item in raw_targets if str(item).strip()}
+
+
+def _preferred_actions(state: Any) -> set[str]:
+    if not isinstance(state, Mapping):
+        return set()
+    raw_actions = state.get("preferred_actions", [])
+    if not isinstance(raw_actions, Sequence) or isinstance(raw_actions, (str, bytes)):
+        return set()
+    return {str(item).strip().lower() for item in raw_actions if str(item).strip()}
 
 
 def _recent_failures(state: Any) -> set[str]:

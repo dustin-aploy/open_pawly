@@ -76,6 +76,9 @@ Open Pawly keeps, with no required network calls:
 - local approval backends
 - local JSONL audit output
 - wrapped execution control
+- standard `user_id` and `session_id` fields
+- replaceable local adapters for sessions, user choices, memory, auth handling,
+  credential providers, and audit
 
 Open Pawly is also allowed to connect outward through two replaceable boundaries:
 
@@ -88,6 +91,12 @@ full set of cloud responsibilities live in `pawly_cloud`. See
 the Pawly Cloud documentation at https://developer.aploy.ai/pawly. The key boundary is that
 cloud services may consume runtime artifacts and decisions by reference, but they do not replace the
 local execution-boundary controller inside the Open Pawly path.
+
+Pawly Cloud adds managed user-aware capabilities around the same delegated goal
+interface: Cloud Sessions, basic and full User Context, Connected Accounts,
+Hosted Auth, Credential Vault references, auth-aware routing, outcome-aware
+routing, and resumable execution after authorization. These are Cloud
+capabilities, not a rename of Pawly, Pawly Routing, or Open Pawly.
 
 For cloud-backed action selection specifically:
 

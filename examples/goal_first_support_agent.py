@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any, NotRequired, TypedDict
 
-from pawly import AuditService, HeuristicPolicy, Pawly, PolicyService, SkillService
+from pawly import AuditService, Pawly, PolicyService, SkillService
 
 
 EXAMPLE_ROOT = Path(__file__).resolve().parent
@@ -52,7 +52,7 @@ pawly = Pawly(
             "issue_refund": issue_refund,
         }
     ),
-    policy=PolicyService.local(routing=HeuristicPolicy()),
+    policy=PolicyService.local(),
     audit=AuditService.local(os.environ.get("PAWLY_AUDIT_PATH", str(EXAMPLE_ROOT / "goal-first-audit.jsonl"))),
 )
 
@@ -69,7 +69,7 @@ class SupportAgentRuntime:
         normalized = user_message.lower()
         if "refund" in normalized or "charged" in normalized:
             objective = f"safe_reply about a billing question; do not issue_refund automatically: {user_message}"
-            constraints = {"max_refund": 0}
+            constraints = {"max_refund": 0, "preferred_actions": ["safe_reply"]}
         elif "order" in normalized:
             objective = f"lookup_order and safe_reply for this customer request: {user_message}"
             constraints = {}
@@ -97,7 +97,7 @@ def logic_plan_without_agent_runtime(user_message: str, *, order_id: str, custom
     normalized = user_message.lower()
     if "refund" in normalized or "charged" in normalized:
         objective = f"safe_reply about a billing question; do not issue_refund automatically: {user_message}"
-        constraints = {"max_refund": 0}
+        constraints = {"max_refund": 0, "preferred_actions": ["safe_reply"]}
     elif "order" in normalized:
         objective = f"lookup_order and safe_reply for this customer request: {user_message}"
         constraints = {}
@@ -115,10 +115,10 @@ def logic_plan_without_agent_runtime(user_message: str, *, order_id: str, custom
     }
 
 
-def handle_agent_message(user_message: str, *, order_id: str, customer_id: str) -> dict[str, Any]:
+def handle_agent_message(user_message: str, *, order_id: str, customer_id: str, user_id: str, session_id: str) -> dict[str, Any]:
     agent_runtime = SupportAgentRuntime()
     plan = agent_runtime.plan(user_message, order_id=order_id, customer_id=customer_id)
-    result = pawly.achieve(**plan)
+    result = pawly.achieve(**plan, user_id=user_id, session_id=session_id)
     if result.status == "completed":
         return {"status": "completed", "result": result.result, "receipt": result.action_receipt}
     if result.status == "needs_review":
@@ -131,5 +131,7 @@ if __name__ == "__main__":
         "I was charged twice. Can you refund me?",
         order_id="ord_123",
         customer_id="cus_123",
+        user_id="user_123",
+        session_id="sess_456",
     )
     print(json.dumps(payload, indent=2, sort_keys=True))
