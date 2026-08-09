@@ -84,6 +84,45 @@ Modules:
 - [audit/replay.py](../src/pawly/audit/replay.py)
 - [audit/diff.py](../src/pawly/audit/diff.py)
 
+## Phase 4.5 — User-aware Compatibility
+
+`Partial`
+
+Why:
+- `pawly.achieve(...)` accepts standard `user_id` and `session_id` fields
+- local adapter boundaries exist for Session, User Choice, Memory, Auth Handler,
+  Credential Provider, routing context, and audit
+- Skill Auth Contract parsing is available for Cloud-compatible manifests
+- Open Pawly can run local user-aware routing extensions without hosted
+  services
+- Hosted Auth, managed OAuth, managed Credential Vault, and Connected Accounts
+  Console remain Pawly Cloud capabilities
+
+Modules:
+- [goal.py](../src/pawly/goal.py)
+- [services/](../src/pawly/services)
+- [skill_manifest.py](../src/pawly/skill_manifest.py)
+- [docs/oss_vs_cloud.md](oss_vs_cloud.md)
+
+## Phase 4.6 — Local Capability Matching
+
+`Partial`
+
+Why:
+- Open Pawly builds candidate actions for all registered local Skill actions and
+  lets local Policy decide which are allowed, require review, blocked, and selected.
+- `SkillRegistry.register(...)` accepts optional metadata without changing the
+  existing local registration path.
+- `pawly.achieve(...)` receipts include selected capability and execution
+  envelope data, but do not present Skill Discovery or Skill Selection as Open Pawly features.
+- Cloud Skill Discovery, Cloud Skill Selection, progressive disclosure, semantic indexes, large-scale
+  recall/rerank, offline evaluation, and adaptive retrieval belong to Pawly
+  Cloud.
+
+Modules:
+- [skill_registry.py](../src/pawly/skill_registry.py)
+- [goal.py](../src/pawly/goal.py)
+
 ## Phase 5 — Advanced Intelligence
 
 `Partial`
@@ -102,6 +141,8 @@ Modules:
 ## Remaining gaps
 
 - no hosted approval UI or webhook service in the Open Pawly workspace
+- no hosted User Context, Hosted Auth, or Connected Accounts Console in Open
+  Pawly
 - no advanced anomaly detection module
 - no production cloud reviewer implementation
 - `budget/` and `performance/` remain runtime overlays inside the same package rather than separate outer packages

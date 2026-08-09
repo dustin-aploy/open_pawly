@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -21,6 +20,8 @@ class GoalExecutionResult:
     decision: dict[str, Any] | None = None
     error: str | None = None
     needs: str | None = None
+    user_id: str | None = None
+    session_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -35,6 +36,10 @@ class GoalExecutionResult:
             payload["error"] = self.error
         if self.needs is not None:
             payload["needs"] = self.needs
+        if self.user_id:
+            payload["user_id"] = self.user_id
+        if self.session_id:
+            payload["session_id"] = self.session_id
         return payload
 
 
@@ -72,10 +77,13 @@ class Pawly:
         context: Mapping[str, Any] | None = None,
         constraints: Mapping[str, Any] | None = None,
         pawprint_config: PawprintConfig | None = None,
+        user_id: str | None = None,
+        session_id: str | None = None,
     ) -> GoalExecutionResult:
         cleaned_objective = str(objective).strip()
         if not cleaned_objective:
             raise ValueError("objective must not be empty")
+        runtime_context = _with_user_context(context, user_id=user_id, session_id=session_id)
         if self.engine is None:
             return GoalExecutionResult(
                 status="configuration_required",
@@ -86,9 +94,11 @@ class Pawly:
                     objective=cleaned_objective,
                     status="configuration_required",
                     selected_action=None,
-                    context=context,
+                    context=runtime_context,
                     constraints=constraints,
                 ),
+                user_id=user_id,
+                session_id=session_id,
             )
         if (self.skills is not None and not self.skills.is_configured()) or not self.policy.is_configured() or not self.audit.is_configured():
             missing = "skills" if self.skills is not None and not self.skills.is_configured() else "policy" if not self.policy.is_configured() else "audit"
@@ -101,29 +111,35 @@ class Pawly:
                     objective=cleaned_objective,
                     status="configuration_required",
                     selected_action=None,
-                    context=context,
+                    context=runtime_context,
                     constraints=constraints,
                     extra={"missing_service": missing},
                 ),
+                user_id=user_id,
+                session_id=session_id,
             )
         if self.engine.skill_registry is None:
             raise MissingSkillRegistryError("achieve requires skills. Pass skills=... or call register_skills(...).")
 
-        selected_pawprint = pawprint_config or self.engine.pawprint_config
-        actions = _build_goal_candidate_actions(cleaned_objective, self.engine.skill_registry, selected_pawprint)
+        actions = [
+            Action(name=name, arguments={"objective": cleaned_objective})
+            for name in self.engine.skill_registry.action_names()
+        ]
         if not actions:
             return GoalExecutionResult(
                 status="unsupported_goal",
                 objective=cleaned_objective,
-                needs="Build the objective from the agent's Pawprint capability names or descriptions, or register a matching skill.",
+                needs="Register at least one local skill before calling pawly.achieve(...).",
                 action_receipt=self._receipt(
                     objective=cleaned_objective,
                     status="unsupported_goal",
                     selected_action=None,
-                    context=context,
+                    context=runtime_context,
                     constraints=constraints,
-                    extra={"available_capabilities": self.engine.skill_registry.action_names()},
+                    extra={"available_capabilities": []},
                 ),
+                user_id=user_id,
+                session_id=session_id,
             )
 
         run_result = self._run_goal_candidate_actions(
@@ -131,10 +147,11 @@ class Pawly:
                 "objective": cleaned_objective,
                 "goal_interface": "achieve",
                 "constraints": dict(constraints or {}),
+                **dict(constraints or {}),
             },
             actions=actions,
             context={
-                **dict(context or {}),
+                **dict(runtime_context or {}),
                 "objective": cleaned_objective,
                 "constraints": dict(constraints or {}),
             },
@@ -152,10 +169,13 @@ class Pawly:
                 objective=cleaned_objective,
                 status=status,
                 selected_action=selected_action,
-                context=context,
+                context=runtime_context,
                 constraints=constraints,
                 run_result=run_result,
+                extra={"candidate_capabilities": [action.name for action in actions]},
             ),
+            user_id=user_id,
+            session_id=session_id,
         )
 
     def _run_goal_candidate_actions(
@@ -225,11 +245,15 @@ def achieve(
     skills: SkillService | SkillRegistry | Mapping[str, Callable[[dict[str, Any], dict[str, Any]], Any]] | None = None,
     policy: PolicyService | None = None,
     audit: AuditService | None = None,
+    user_id: str | None = None,
+    session_id: str | None = None,
 ) -> GoalExecutionResult:
     return Pawly(pawprint, skills=skills, policy=policy, audit=audit).achieve(
         objective=objective,
         context=context,
         constraints=constraints,
+        user_id=user_id,
+        session_id=session_id,
     )
 
 
@@ -245,20 +269,6 @@ def _resolve_skill_service(
     return SkillService.local(skills)
 
 
-def _build_goal_candidate_actions(objective: str, skill_registry: SkillRegistry, pawprint: PawprintConfig | None = None) -> list[Action]:
-    names = skill_registry.action_names()
-    if not names:
-        return []
-    objective_tokens = _tokens(objective)
-    descriptions = {} if pawprint is None else dict(pawprint.capability_descriptions)
-    candidates: list[Action] = []
-    for name in names:
-        match_text = f"{name} {descriptions.get(name, '')}".strip()
-        if _overlap_score(objective_tokens, _tokens(match_text)) > 0:
-            candidates.append(Action(name=name, arguments={"objective": objective}))
-    return candidates
-
-
 def _selected_action_from_run_result(run_result: Mapping[str, Any]) -> Action | None:
     decision = run_result.get("decision")
     if not isinstance(decision, Mapping):
@@ -269,12 +279,18 @@ def _selected_action_from_run_result(run_result: Mapping[str, Any]) -> Action | 
     return Action.from_dict(dict(selected))
 
 
-def _tokens(value: str) -> set[str]:
-    return {token for token in re.split(r"[^a-zA-Z0-9]+", value.lower()) if token}
-
-
-def _overlap_score(left: set[str], right: set[str]) -> int:
-    return len(left & right)
+def _with_user_context(
+    context: Mapping[str, Any] | None,
+    *,
+    user_id: str | None,
+    session_id: str | None,
+) -> dict[str, Any]:
+    payload = dict(context or {})
+    if user_id:
+        payload.setdefault("user_id", user_id)
+    if session_id:
+        payload.setdefault("session_id", session_id)
+    return payload
 
 
 def _execution_envelope(

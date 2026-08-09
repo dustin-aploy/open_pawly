@@ -75,9 +75,13 @@ def achieve(
     skills: SkillService | SkillRegistry | Mapping[str, Any] | None = None,
     policy: PolicyService | None = None,
     audit: AuditService | None = None,
+    user_id: str | None = None,
+    session_id: str | None = None,
 ) -> GoalExecutionResult:
     return Pawly(str(pawprint), skills=skills, policy=policy, audit=audit).achieve(
         objective=objective,
         context=context,
         constraints=constraints,
+        user_id=user_id,
+        session_id=session_id,
     )

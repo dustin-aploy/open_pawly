@@ -152,7 +152,7 @@ Create `support_agent.py`:
 ```python
 from typing import Any, NotRequired, TypedDict
 
-from pawly import AuditService, HeuristicPolicy, Pawly, PolicyService, SkillService
+from pawly import AuditService, Pawly, PolicyService, SkillService
 
 
 class AgentPlan(TypedDict):
@@ -193,7 +193,7 @@ pawly = Pawly(
             "issue_refund": issue_refund,
         }
     ),
-    policy=PolicyService.local(routing=HeuristicPolicy()),
+    policy=PolicyService.local(),
     audit=AuditService.local("./pawly-audit.jsonl"),
 )
 
@@ -234,17 +234,30 @@ plan = agent_runtime.plan(
     order_id="ord_123",
     customer_id="cus_123",
 )
-result = pawly.achieve(**plan)
+result = pawly.achieve(
+    **plan,
+    user_id="user_123",
+    session_id="sess_456",
+)
 
 print(result.status)
 print(result.result)
 print(result.action_receipt)
 ```
 
-Pawly builds the candidate actions from registered skills, applies the Pawprint
-boundaries, scores the eligible actions, executes the selected skill, and returns
-a receipt. The receipt shows which capability was selected, which boundary
-applied, and what was recorded for audit.
+Pawly builds candidate actions for every registered local Skill action. It
+applies the Pawprint boundaries, scores the eligible actions, executes the selected Skill, and
+returns a receipt. The receipt shows which capability was selected, which
+boundary applied, and what was recorded for audit.
+
+`user_id` and `session_id` are optional in Open Pawly and standard in Pawly
+Cloud. Passing them lets Cloud make skill execution user-aware: it can use the
+end user's session, explicit choices, relevant memories, connected accounts,
+permission state, and recent outcomes when routing and executing Skills. If a
+Skill needs authorization, Cloud returns an
+`auth_required` status with a Hosted Auth URL and resumes the same session after
+authorization. Credentials stay behind runtime-only references and are not sent
+to prompts, model context, or ordinary traces.
 
 The agent runtime can still use an LLM to understand the conversation and
 produce the structured plan. The production credentials stay behind the
@@ -257,12 +270,32 @@ it contains `objective`, `context`, and optional `constraints`. If the workflow
 is deterministic business logic, use the same shape from normal code; Pawly does
 not require an LLM.
 
-For Open Pawly local routing, the objective must use the agent's Pawprint
-capability language: names such as `safe_reply` or terms from the capability
-description such as `read order status`. If the objective is only raw user text,
-Pawly may return `unsupported_goal` because it cannot build a safe candidate
-set. This is intentional: the runtime should fail closed rather than guess which
-production action to run.
+Open Pawly does not narrow local Skills before Policy evaluation. If a local
+registry has many Skills, `pawly.achieve(...)` sends all registered actions to
+the local Policy path; Cloud Starter is the first level that adds hosted Skill
+Discovery and basic Skill Selection before action schemas are exposed.
+
+Metadata can still be attached during local registration for receipts,
+developer tooling, and Cloud migration:
+
+```python
+registry.register(
+    "lookup_order",
+    lookup_order,
+    metadata={
+        "description": "Read order status for a customer",
+        "tags": ["orders", "support"],
+        "category": "commerce",
+        "schema": {"order_id": "string"},
+    },
+)
+```
+
+Open Pawly uses local Policy over all registered actions for safety, not hosted
+Skill Discovery or Skill Selection. Pawly Cloud adds managed registry metadata, plan-aware
+filtering, Cloud Skill Discovery, Cloud Skill Selection, progressive disclosure, hosted authorization
+state, and richer trace statistics without changing the `pawly.achieve(...)`
+call.
 
 The same flow is available as a runnable example:
 
@@ -279,7 +312,7 @@ agent is no longer just your local experiment: teammates need to see what ran,
 customers ask why an action happened, approvals need a shared place to live, or
 you want to add managed skills without maintaining another tool integration.
 Keep the same three service shape and connect only the parts you want to run
-through Pawly Cloud. Get a free project API key from
+through Pawly Cloud. Get a Cloud Starter project API key from
 [Pawly Developer](https://developer.aploy.ai/pawly).
 
 ```bash
@@ -394,6 +427,7 @@ Common statuses:
 | --- | --- |
 | `completed` | A matching local skill ran successfully. |
 | `unsupported_goal` | No registered skill matched the delegated objective. |
+| `auth_required` | Pawly Cloud selected a Skill but needs the end user to connect an account or grant a required scope before the same session can resume. |
 | `configuration_required` | A Pawprint path or cloud key is missing; the receipt includes the next step. |
 | `failed` | Local execution failed or was blocked. |
 
@@ -443,6 +477,8 @@ See [`src/pawly/adapters/README.md`](src/pawly/adapters/README.md) and
 - [Pawprint policy engine](docs/pawprint_policy_engine.md)
 - [Protected skills](docs/protected_skills.md)
 - [Project status](docs/status.md)
+- [Open Pawly vs Pawly Cloud](docs/oss_vs_cloud.md)
+- [Pawly capability levels](../../docs/pawly_capability_levels.md)
 
 ## Development
 
@@ -473,7 +509,7 @@ Open Pawly is split by runtime responsibility, not by product surface:
 src/pawly/
   goal.py             goal-oriented Pawly(...).achieve(...) facade
   services/           public SkillService, PolicyService, and AuditService wiring
-  runtime*.py         local decision, execution, receipts, and fallback behavior
+  runtime*.py         local decision, execution, receipts, and failure handling
   policy*/            local Pawprint policy checks and action scoring
   skill_registry.py   local skill registration and dispatch
   audit/              local audit ledger and replay helpers

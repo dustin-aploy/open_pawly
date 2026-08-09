@@ -1,7 +1,7 @@
 # Open Pawly Architecture
 
 In this document `pawly` means the open-source package published from `open_pawly`.
-The full product (open source plus the cloud version) is referred to as the Pawly platform.
+The full product (Open Pawly plus the cloud version) is referred to as the Pawly platform.
 Cloud-only behavior lives in `pawly_cloud` and is never required for the Open Pawly path.
 
 ## Pipeline
@@ -16,11 +16,12 @@ More concretely:
 2. Pawly normalizes it into an `Intent`
    In the current workspace this is direct `Intent` input or `TaskRequest -> Intent` adaptation rather than a larger standalone normalization subsystem.
 3. Pawly loads the declarative Pawprint file and converts it into internal runtime config
-4. Pawly applies Pawprint boundaries to candidate actions or incoming execution requests
-5. Pawly produces a `Decision`
-6. if the decision is `require_approval`, the approval backend resolves it
-7. the execution gateway either blocks, simulates, or calls the real executor
-8. audit events capture the governed path for replay and diff
+4. Pawly builds candidate actions for all registered local Skill actions
+5. Pawly applies Pawprint boundaries to candidate actions or incoming execution requests
+6. Pawly produces a `Decision`
+7. if the decision is `require_approval`, the approval backend resolves it
+8. the execution gateway either blocks, simulates, or calls the real executor
+9. audit events capture the governed path for replay and diff
 
 Pawly wraps execution. It does not replace planning.
 
@@ -49,6 +50,8 @@ Internal runtime schemas:
   - skill-protection support in Open Pawly is parse plus a limited local guardrail (see `protected_oss.py`); it does not implement cloud-grade enforcement
 - candidate action selection:
   - [action_selection.py](../src/pawly/action_selection.py)
+- local Skill registry:
+  - [skill_registry.py](../src/pawly/skill_registry.py)
 - deterministic policy engine:
   - [policy_engine/engine.py](../src/pawly/policy_engine/engine.py)
   - [policy_engine/decision.py](../src/pawly/policy_engine/decision.py)
