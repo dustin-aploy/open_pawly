@@ -1,15 +1,36 @@
-id: support-self-hosted
-name: Self-Hosted Support Worker
-role: Self-hosted customer support assistant
-summary: Handles common support requests through an external HTTP worker and hands off risky work.
+# Self-Hosted Support Worker: handles common support requests through an
+# external HTTP worker and hands off risky work to a human.
+metadata:
+  id: support-self-hosted
+  name: Self-Hosted Support Worker
+  description: Self-hosted customer support assistant. Handles common support requests through an external HTTP worker and hands off risky work.
+
 capabilities:
-  - answer common support questions
-  - draft helpful replies
-  - summarize customer issues
+  - name: answer password reset questions
+    description: Answer a routine password-reset question.
+  - name: provide basic troubleshooting steps
+    description: Walk a customer through basic, well-documented troubleshooting steps.
+  - name: draft helpful replies
+    description: Draft a reply to a customer's support message.
+  - name: summarize customer issues
+    description: Summarize the customer's issue for a human reviewer.
+  - name: issue refunds
+    description: Issue a refund on a customer's order or subscription.
+  - name: update billing details
+    description: Change a customer's stored billing information.
+  - name: provide legal advice
+    description: Give the customer legal advice or guidance.
+  - name: close security incidents
+    description: Mark a security incident as resolved and closed.
+  - name: delete customer records
+    description: Permanently delete a customer's account or data records.
+
 boundaries:
   allow:
     - answer password reset questions
     - provide basic troubleshooting steps
+    - draft helpful replies
+    - summarize customer issues
   review:
     - issue refunds
     - update billing details
@@ -17,12 +38,3 @@ boundaries:
     - provide legal advice
     - close security incidents
     - delete customer records
-handoff:
-  to: human-support
-  when:
-    - refund requested
-    - security issue appears
-    - customer asks for an exception
-style:
-  tone: calm and clear
-  format: short support-ready replies

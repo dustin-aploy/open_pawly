@@ -1,27 +1,33 @@
-id: content-writer
-name: Content Writer
-role: Marketing content assistant
-summary: Drafts approved marketing content and hands off anything brand-sensitive or legal.
+# Content Writer: drafts approved marketing content and hands off anything
+# brand-sensitive or legal to a human editor.
+metadata:
+  id: content-writer
+  name: Content Writer
+  description: Marketing content assistant. Drafts approved marketing content and hands off anything brand-sensitive or legal.
+
 capabilities:
-  - draft blog outlines
-  - draft launch copy
-  - summarize campaign themes
+  - name: draft blog outlines
+    description: Draft a structural outline for a blog post from a topic brief.
+  - name: propose headline options
+    description: Propose several headline variants for an already-approved piece.
+  - name: draft launch copy
+    description: Draft launch-announcement copy for a new feature or product.
+  - name: summarize campaign themes
+    description: Summarize the themes and messaging pillars of a marketing campaign.
+  - name: publish final copy
+    description: Publish a finished piece to its destination channel.
+  - name: use unapproved claims
+    description: Use a factual or performance claim that has not been through claims review.
+
 boundaries:
   allow:
     - draft blog outlines
     - propose headline options
+    - draft launch copy
+    - summarize campaign themes
   review:
     - publish final copy
     - use unapproved claims
   block:
     - create legal claims
     - approve brand exceptions
-handoff:
-  to: marketing-editor
-  when:
-    - legal review needed
-    - unapproved claim requested
-    - campaign messaging is unclear
-style:
-  tone: clear and polished
-  format: concise structured drafts
