@@ -146,6 +146,8 @@ def _build_hosted_action_sync() -> HostedActionSyncAuditSink | None:
 
 
 def _action_ingest_payload(event: dict[str, Any]) -> dict[str, Any]:
+    final_decision = event.get("final_decision") if isinstance(event.get("final_decision"), dict) else {}
+    policy_evaluation = event.get("policy_evaluation") if isinstance(event.get("policy_evaluation"), dict) else {}
     return {
         "event_id": event.get("event_id"),
         "decision_id": event.get("decision_id"),
@@ -159,8 +161,23 @@ def _action_ingest_payload(event: dict[str, Any]) -> dict[str, Any]:
         "request_id": event.get("request_id"),
         "metadata": {
             "reason_codes": event.get("reason_codes") or [],
+            "matched_rules": event.get("matched_policy_rules") or event.get("matched_rules") or [],
+            "matched_policy_rules": event.get("matched_policy_rules") or [],
             "policy_references": event.get("policy_references") or [],
+            "policy_evaluation": policy_evaluation,
+            "final_decision": final_decision,
+            "escalation_recommendation": str(
+                (final_decision or {}).get("type")
+                or (policy_evaluation or {}).get("escalation_recommendation")
+                or ""
+            ),
+            "protection_level": event.get("protection_level") or "",
+            "protection_handling": event.get("protection_handling") or "",
+            "protection_assets": event.get("protection_assets") or [],
+            "action_argument_summary": event.get("action_argument_summary") or {},
+            "output_summary": event.get("output_summary") or {},
             "execution_result_ref": event.get("execution_result_ref"),
+            "environment": event.get("tenant_id") or "",
         },
     }
 
