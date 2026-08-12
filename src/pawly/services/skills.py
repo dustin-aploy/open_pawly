@@ -93,6 +93,22 @@ class SkillService:
     def to_registry(self) -> SkillRegistry:
         return self.registry
 
+    def pawprint_skills(self, *, default: str = "block") -> dict[str, dict[str, str]]:
+        """Build the compact Pawprint table from the currently registered actions.
+
+        Action names use ``skill.action``. A caller may merge this result with an
+        existing Pawprint so that user-selected decisions are preserved.
+        """
+        if default not in {"block", "review", "allow", "smart"}:
+            raise ValueError("default must be block, review, allow, or smart")
+        result: dict[str, dict[str, str]] = {}
+        for name in self.registry.action_names():
+            skill_id, separator, action_id = name.partition(".")
+            if not separator or not skill_id or not action_id:
+                skill_id, action_id = "default", name
+            result.setdefault(skill_id, {})[action_id] = default
+        return result
+
     def alerts(self) -> list[dict[str, str]]:
         if self.cloud_connection is None:
             return []

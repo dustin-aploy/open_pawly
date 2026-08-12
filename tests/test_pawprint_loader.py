@@ -15,6 +15,17 @@ from pawly.validator.validator import SchemaValidationError
 
 
 class PawprintLoaderTests(unittest.TestCase):
+    def test_compact_skill_action_boundaries_are_loaded(self):
+        pawprint = parse_pawprint_document(
+            {
+                "metadata": {"id": "support", "name": "Support", "description": "Support worker"},
+                "capabilities": [],
+                "skills": {"customer_support": {"issue_refund": "smart", "get_order": "allow"}},
+            }
+        )
+        self.assertEqual(pawprint.smart_actions, ["customer_support.issue_refund"])
+        self.assertEqual(pawprint.allowed_actions, ["customer_support.get_order"])
+
     def test_parses_internal_action_groups_from_schema_document(self):
         raw_document = {
             "metadata": {

@@ -98,6 +98,9 @@ package named `pawprint`.
 
 ## Quickstart
 
+For generated Skill/action Pawprints and local `smart` decisions, see
+[`docs/smart-pawprint.md`](docs/smart-pawprint.md).
+
 ### 1. Define the agent boundary
 
 Start with the agent, not with a tool wrapper. Create

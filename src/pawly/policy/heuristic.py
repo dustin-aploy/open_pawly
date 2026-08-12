@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 
 from pawly.contracts import Action, PolicyScore
 
@@ -40,6 +41,38 @@ class HeuristicPolicy(Policy):
 
 
 DefaultOssPolicy = HeuristicPolicy
+
+
+@dataclass(frozen=True, slots=True)
+class SmartPolicyDecision:
+    decision: Literal["block", "review", "allow"]
+    reason_code: str
+    confidence: float
+    source: str = "local_heuristic"
+
+
+class HeuristicSmartPolicy:
+    """Fast, deterministic local triage for Pawprint actions marked ``smart``."""
+
+    def decide(self, state: Any, actions: Sequence[Action]) -> list[SmartPolicyDecision]:
+        return [self._decide_one(state, action) for action in actions]
+
+    def _decide_one(self, state: Any, action: Action) -> SmartPolicyDecision:
+        name_terms = _tokenize(action.name)
+        if not isinstance(state, Mapping):
+            return SmartPolicyDecision("review", "smart_context_missing", 0.25)
+        if state.get("policy_block") is True or state.get("account_restricted") is True:
+            return SmartPolicyDecision("block", "smart_rule_blocked", 0.98)
+        if state.get("requires_review") is True or state.get("risk_score", 0) >= 0.6:
+            return SmartPolicyDecision("review", "smart_rule_review", 0.9)
+        amount = action.arguments.get("amount", action.arguments.get("refund_amount"))
+        if isinstance(amount, (int, float)) and amount > 50:
+            return SmartPolicyDecision("review", "smart_amount_review", 0.9)
+        if name_terms & _HIGH_IMPACT_TERMS and not state.get("verified", False):
+            return SmartPolicyDecision("review", "smart_verification_required", 0.75)
+        if state.get("context_complete") is False:
+            return SmartPolicyDecision("review", "smart_context_incomplete", 0.75)
+        return SmartPolicyDecision("allow", "smart_low_risk_allow", 0.7)
 
 
 def _score_action(

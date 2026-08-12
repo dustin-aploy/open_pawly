@@ -119,6 +119,8 @@ class PawprintConfig:
     allowed_actions: list[str] = field(default_factory=list)
     review_actions: list[str] = field(default_factory=list)
     blocked_actions: list[str] = field(default_factory=list)
+    smart_actions: list[str] = field(default_factory=list)
+    action_boundaries: dict[str, str] = field(default_factory=dict)
     protection: ProtectionConfig | None = None
     skill_metadata: SkillMetadata | None = None
     model_visible_skill_context: dict[str, Any] = field(default_factory=dict)
@@ -134,6 +136,7 @@ class PawprintConfig:
                 "allowed": list(self.allowed_actions),
                 "requiring_review": list(self.review_actions),
                 "blocked": list(self.blocked_actions),
+                "smart": list(self.smart_actions),
             },
         }
         if self.protection is not None:
@@ -177,6 +180,17 @@ def parse_pawprint_document(raw_document: dict[str, Any]) -> PawprintConfig:
     protection = _mapping(raw_document.get("protection"))
     skill = _mapping(raw_document.get("skill"))
     capabilities = raw_document.get("capabilities", [])
+    action_boundaries = _skill_action_boundaries(raw_document.get("skills"))
+    if action_boundaries:
+        allowed_actions = [name for name, decision in action_boundaries.items() if decision == "allow"]
+        review_actions = [name for name, decision in action_boundaries.items() if decision == "review"]
+        blocked_actions = [name for name, decision in action_boundaries.items() if decision == "block"]
+        smart_actions = [name for name, decision in action_boundaries.items() if decision == "smart"]
+    else:
+        allowed_actions = _string_list(boundaries.get("auto", boundaries.get("allow", [])))
+        review_actions = _string_list(boundaries.get("ask_first", boundaries.get("review", [])))
+        blocked_actions = _string_list(boundaries.get("never", boundaries.get("block", [])))
+        smart_actions = _string_list(boundaries.get("smart", []))
     skill_metadata = _parse_skill_metadata(metadata, skill)
     resolved_id = str(raw_document.get("id") or metadata.get("id") or "").strip()
     resolved_name = str(raw_document.get("name") or metadata.get("name") or "").strip()
@@ -193,9 +207,11 @@ def parse_pawprint_document(raw_document: dict[str, Any]) -> PawprintConfig:
         description=resolved_description,
         capabilities=_capability_names(capabilities),
         capability_descriptions=_capability_descriptions(capabilities),
-        allowed_actions=_string_list(boundaries.get("auto", boundaries.get("allow", []))),
-        review_actions=_string_list(boundaries.get("ask_first", boundaries.get("review", []))),
-        blocked_actions=_string_list(boundaries.get("never", boundaries.get("block", []))),
+        allowed_actions=allowed_actions,
+        review_actions=review_actions,
+        blocked_actions=blocked_actions,
+        smart_actions=smart_actions,
+        action_boundaries=action_boundaries,
         protection=_parse_protection_config(protection),
         skill_metadata=skill_metadata,
         model_visible_skill_context={} if skill_metadata is None else dict(skill_metadata.model_visible_context),
@@ -223,6 +239,25 @@ def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _skill_action_boundaries(value: Any) -> dict[str, str]:
+    """Parse the compact generated form: skills.<skill>.<action>: decision."""
+    if not isinstance(value, dict):
+        return {}
+    resolved: dict[str, str] = {}
+    for skill_id, actions in value.items():
+        if not isinstance(actions, dict):
+            continue
+        skill = str(skill_id).strip()
+        if not skill:
+            continue
+        for action_id, decision in actions.items():
+            action = str(action_id).strip()
+            normalized = str(decision).strip().lower()
+            if action and normalized in {"block", "review", "allow", "smart"}:
+                resolved[f"{skill}.{action}"] = normalized
+    return resolved
 
 
 def _capability_names(value: Any) -> list[str]:

@@ -121,6 +121,28 @@ protection:
 
 
 class RunActionsTests(unittest.TestCase):
+    def test_unknown_action_is_explicitly_blocked(self):
+        runtime, _ = self._make_runtime(BASIC_WORKER)
+        decision = runtime.decide_actions({}, [Action(name="not_declared", arguments={})])
+        self.assertIsNone(decision.selected_action)
+        self.assertEqual([action.name for action in decision.blocked_actions], ["not_declared"])
+
+    def test_compact_smart_action_uses_local_heuristic(self):
+        worker = """
+metadata:
+  id: smart-worker
+  name: Smart Worker
+  description: Smart action test.
+capabilities: []
+skills:
+  support:
+    issue_refund: smart
+"""
+        runtime, _ = self._make_runtime(worker)
+        decision = runtime.decide_actions({"context_complete": False}, [Action(name="support.issue_refund", arguments={})])
+        self.assertTrue(decision.requires_review)
+        self.assertEqual(decision.selected_action.name, "support.issue_refund")
+
     def _make_runtime(self, worker_text: str) -> tuple[DecisionEngine, Path]:
         tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(tempdir.cleanup)

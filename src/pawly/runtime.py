@@ -18,6 +18,7 @@ from pawly.budget.state import BudgetState
 from pawly.loader.schema_loader import load_pawprint_version
 from pawly.pawprint_loader import PawprintConfig
 from pawly.policy.base import Policy, score_source as policy_score_source
+from pawly.policy.heuristic import HeuristicSmartPolicy
 from pawly.runtime_bootstrap import RuntimeConfig, RuntimeServices, ScoringPolicyFallbackMode, bootstrap_runtime
 from pawly.runtime_decision import evaluate_core_policy
 from pawly.runtime_execute import evaluate_runtime_intent
@@ -89,6 +90,7 @@ class DecisionEngine:
         self.skill_registry: SkillRegistry | None = None
         self.shield_policy = ShieldPolicy()
         self.approval_backend = approval_backend
+        self.smart_policy = HeuristicSmartPolicy()
 
     def evaluate(self, task: str, action: str, confidence: float, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
         return self.evaluate_result(task, action, confidence, metadata).to_dict()
@@ -141,6 +143,10 @@ class DecisionEngine:
     ) -> ActionDecision:
         pawprint = pawprint_config or self.pawprint_config
         classified = _classify_actions(actions, pawprint)
+        smart_decisions = self.smart_policy.decide(state, classified["smart"])
+        for action, decision in zip(classified["smart"], smart_decisions):
+            bucket = "blocked" if decision.decision == "block" else decision.decision
+            classified[bucket].append(action)
         scoring_resolution = _resolve_scoring_policy(self)
 
         allowed_candidates = _build_candidates(
@@ -513,11 +519,13 @@ def _classify_actions(actions: Sequence[Action], pawprint: PawprintConfig) -> di
     blocked = {_normalize_name(name) for name in pawprint.blocked_actions}
     review = {_normalize_name(name) for name in pawprint.review_actions}
     allowed = {_normalize_name(name) for name in pawprint.allowed_actions}
+    smart = {_normalize_name(name) for name in pawprint.smart_actions}
 
     buckets: dict[str, list[Action]] = {
         "allow": [],
         "review": [],
         "blocked": [],
+        "smart": [],
     }
     for action in actions:
         normalized = _normalize_name(action.name)
@@ -527,6 +535,10 @@ def _classify_actions(actions: Sequence[Action], pawprint: PawprintConfig) -> di
             buckets["review"].append(action)
         elif normalized in allowed:
             buckets["allow"].append(action)
+        elif normalized in smart:
+            buckets["smart"].append(action)
+        else:
+            buckets["blocked"].append(action)
     return buckets
 
 

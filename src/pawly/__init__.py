@@ -28,15 +28,23 @@ from .adapters import (
 from .api import achieve, decide, run, run_actions
 from .approval import (
     ApprovalHandler,
+    ApprovalNotificationMessage,
+    ApprovalNotificationPlatform,
     ApprovalRecord,
     ApprovalRequest,
     ApprovalResponse,
     ApprovalRouter,
     ApprovalStatus,
     CallbackApprovalNotifier,
+    DEFAULT_PLATFORMS,
+    EmailApprovalNotificationPlatform,
     FileApprovalQueue,
     InMemoryApprovalQueue,
+    MultiChannelApprovalNotifier,
+    NotificationDeliveryResult,
+    SlackApprovalNotificationPlatform,
     StaticApprovalHandler,
+    TelegramApprovalNotificationPlatform,
 )
 from .backends import (
     AdvancedRiskProviderStub,
@@ -75,7 +83,7 @@ from .pawprint_loader import (
     load_pawprint_file,
     parse_pawprint_document,
 )
-from .policy import DefaultOssPolicy, HeuristicPolicy, Policy
+from .policy import DefaultOssPolicy, HeuristicPolicy, HeuristicSmartPolicy, Policy, SmartPolicyDecision
 from .policy.base import ScoringPolicyUnavailableError, score_source, tag_scores
 from .policy.resolve import resolve_scoring_policy
 from .policy_engine.engine import evaluate_pawprint
@@ -91,6 +99,8 @@ __all__ = [
     "Action",
     "ApprovalBackend",
     "ApprovalHandler",
+    "ApprovalNotificationMessage",
+    "ApprovalNotificationPlatform",
     "ApprovalRecord",
     "ApprovalRequest",
     "ApprovalResponse",
@@ -111,13 +121,19 @@ __all__ = [
     "CloudAuditSinkStub",
     "CloudReviewerStub",
     "CompositeAuditSink",
+    "DEFAULT_PLATFORMS",
     "Decision",
     "DecisionState",
+    "EmailApprovalNotificationPlatform",
     "ExecutionGateway",
     "GatewayProtocol",
     "GoalExecutionResult",
     "GraphTransition",
     "FileApprovalQueue",
+    "MultiChannelApprovalNotifier",
+    "NotificationDeliveryResult",
+    "SlackApprovalNotificationPlatform",
+    "TelegramApprovalNotificationPlatform",
     "InMemoryApprovalQueue",
     "InvokeRequest",
     "LangGraphPawAdapter",
@@ -146,6 +162,7 @@ __all__ = [
     "RiskProvider",
     "RuntimeDecisionResult",
     "HeuristicPolicy",
+    "HeuristicSmartPolicy",
     "HostedActionSyncAuditSink",
     "RulePolicy",
     "RuleReviewer",
@@ -158,6 +175,7 @@ __all__ = [
     "StaticApprovalHandler",
     "SkillRegistry",
     "SkillService",
+    "SmartPolicyDecision",
     "PROTECTED_SKILL_WARNING",
     "build_model_visible_skill_context",
     "build_default_audit_sink",
