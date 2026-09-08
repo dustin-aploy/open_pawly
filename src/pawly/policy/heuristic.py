@@ -82,10 +82,14 @@ def _score_action(
     preferred_actions: set[str],
     recent_failures: set[str],
 ) -> PolicyScore:
+    delivery_score = _score_known_message_delivery(action, recent_failures=recent_failures)
+    if delivery_score is not None:
+        return delivery_score
+
     score = 0.5
     reason_codes: list[str] = []
     matched_rules: list[str] = []
-    audit_tags: list[str] = ["policy:heuristic"]
+    audit_tags: list[str] = ["policy:heuristic", "risk:operational"]
 
     if action.target:
         normalized_target = action.target.strip().lower()
@@ -132,6 +136,61 @@ def _score_action(
         matched_rules=matched_rules,
         audit_tags=audit_tags,
     )
+
+
+def _score_known_message_delivery(action: Action, *, recent_failures: set[str]) -> PolicyScore | None:
+    """Score a reply to a known chat independently from generic action complexity.
+
+    Inline callback buttons are handled by the same agent in a later request, so
+    their nested JSON is not additional outbound risk. Links and embedded apps
+    do change where a user can be sent and receive explicit adjustments instead.
+    """
+    normalized_name = action.name.strip().lower()
+    if not normalized_name.endswith((".send_message", ".send_interactive_card", ".present_card")):
+        return None
+    arguments = action.arguments
+    recipient = arguments.get("chat_id") or arguments.get("user_id") or arguments.get("to_user")
+    if not str(recipient or "").strip():
+        return None
+
+    score = 0.18
+    reason_codes = ["known_message_recipient"]
+    audit_tags = ["policy:heuristic", "risk:operational", "action:known_message_delivery"]
+    markup = arguments.get("reply_markup")
+    buttons = _message_buttons(markup)
+    if buttons:
+        reason_codes.append("interactive_reply")
+    if any(any(key in button for key in ("url", "login_url")) for button in buttons):
+        score += 0.2
+        reason_codes.append("external_link_in_reply")
+    if any(any(key in button for key in ("web_app", "login_url")) for button in buttons):
+        score += 0.22
+        reason_codes.append("embedded_app_or_login")
+    if normalized_name in recent_failures:
+        score += 0.2
+        reason_codes.append("recent_failure")
+        audit_tags.append("history:retry")
+    return PolicyScore(
+        risk_score=_clamp(score),
+        reason_codes=reason_codes,
+        matched_rules=[],
+        audit_tags=audit_tags,
+    )
+
+
+def _message_buttons(markup: Any) -> list[Mapping[str, Any]]:
+    if not isinstance(markup, Mapping):
+        return []
+    rows = markup.get("inline_keyboard") or markup.get("buttons") or []
+    if not isinstance(rows, Sequence) or isinstance(rows, (str, bytes)):
+        return []
+    buttons: list[Mapping[str, Any]] = []
+    for row in rows:
+        values = row if isinstance(row, Sequence) and not isinstance(row, (str, bytes)) else [row]
+        for button in values:
+            if isinstance(button, Mapping):
+                buttons.append(button)
+    return buttons
 
 
 def _preferred_targets(state: Any) -> set[str]:

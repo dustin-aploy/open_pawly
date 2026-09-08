@@ -21,7 +21,7 @@ class ExampleWorkerRuntimeTests(unittest.TestCase):
         validation = self.validator.validate_agent_config(load_yaml_file(self.worker_path))
         self.assertTrue(validation.valid, validation.errors)
 
-    def test_smart_boundary_is_rejected_by_schema(self):
+    def test_smart_boundary_rejects_legacy_object_entries(self):
         worker = load_yaml_file(self.worker_path)
         worker["boundaries"]["smart"] = [
             {
@@ -31,9 +31,9 @@ class ExampleWorkerRuntimeTests(unittest.TestCase):
         ]
         validation = self.validator.validate_agent_config(worker)
         self.assertFalse(validation.valid)
-        self.assertIn("$.boundaries.smart is not allowed by the Pawprint schema", validation.errors)
+        self.assertIn("$.boundaries.smart[0] must be a string", validation.errors)
 
-    def test_smart_boundary_entries_are_not_part_of_the_contract(self):
+    def test_smart_boundary_requires_compact_action_names(self):
         worker = load_yaml_file(self.worker_path)
         worker["boundaries"]["smart"] = [
             {
@@ -43,7 +43,13 @@ class ExampleWorkerRuntimeTests(unittest.TestCase):
         ]
         validation = self.validator.validate_agent_config(worker)
         self.assertFalse(validation.valid)
-        self.assertIn("$.boundaries.smart is not allowed by the Pawprint schema", validation.errors)
+        self.assertIn("$.boundaries.smart[0] must be a string", validation.errors)
+
+    def test_smart_boundary_accepts_compact_action_names(self):
+        worker = load_yaml_file(self.worker_path)
+        worker["boundaries"]["smart"] = ["approve_campaign"]
+        validation = self.validator.validate_agent_config(worker)
+        self.assertTrue(validation.valid, validation.errors)
 
     def test_basic_worker_completes_safe_request(self):
         audit_path = self._audit_path("basic-worker-complete")

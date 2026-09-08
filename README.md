@@ -1,62 +1,57 @@
-# Pawly
+# Open Pawly
+
+**Product scope: [OSS].**
 
 <p align="center">
   <img src="docs/assets/icon.png" alt="Pawly icon" width="128">
 </p>
 
 <p align="center">
-  <strong>Managed, safe execution for AI agent actions.</strong>
+  <strong>The local, open-source Action Layer for AI agents.</strong>
 </p>
 
-Pawly takes over the messy part of agent execution: deciding which capability
-should run, checking whether it is allowed, wrapping the call in a policy-aware
-execution path, and returning a receipt you can debug or audit later. It is built
-for the moment an agent is about to touch the outside world: send an email,
-publish content, issue a refund, update a record, call an API, or trigger a
-payment.
+Pawly is the Action Layer between AI agents and real-world execution. Open Pawly
+provides that layer locally: an agent delegates a goal, local Policy evaluates
+every registered Skill/action, approved work runs through the local execution
+boundary, and Pawly writes a receipt you can debug or audit later.
 
-Instead of wiring every tool call, permission rule, fallback, and audit record by
-hand, your agent delegates a goal to Pawly. Pawly manages the execution path so
-your agent can act without quietly doing something unsafe, unauthorized, or
-impossible to reconstruct later.
+It is built for the moment an agent is about to touch the outside world: send an
+email, publish content, issue a refund, update a record, call an API, or trigger
+a payment. AI can think freely. Once it acts, Pawly takes control.
 
-Pawly is not another agent framework. It is the safety and execution layer you
-put behind one: your agent decides what it wants, Pawly manages how that action
-is allowed to run.
+Pawly is not another agent framework, a Skill marketplace, or an MCP
+replacement. MCP and agent frameworks can expose or propose capabilities; Open
+Pawly controls how a goal reaches registered local actions under local Policy.
 
-This repository contains Open Pawly, the local runtime for defining action
-boundaries, registering skills, running policy checks, and collecting receipts
-before your agent touches external systems.
-
-## Status
-
-Pawly is in alpha. The goal interface, Pawprint boundary model, and local
-execution receipts are the primary stable surfaces. Lower-level adapter and
-gateway APIs may continue to evolve.
+This repository contains Open Pawly only. It provides goal-first execution,
+local Skill registration and execution, local Policy, Session/Context/Memory
+adapter interfaces, a local Credential Provider interface, local AuditService,
+and JSONL receipts. It does not provide Skill Discovery, Skill Selection, or
+Progressive Disclosure as product capabilities.
 
 ## Why Pawly
 
 Building agent products gets painful and risky right after the demo works. You
-start with tool calls, then quickly need routing, permission checks, blocked
+start with tool calls, then quickly need action boundaries, permission checks, blocked
 actions, review paths, audit logs, reproducible receipts, and framework adapters.
 The hardest bugs are not syntax errors; they are agents calling the wrong tool,
 acting outside their scope, or leaving no useful trace when something goes wrong.
 
 Pawly packages that execution work into a small runtime:
 
-- **Stop hand-rolling tool routing.** Delegate an objective and let Pawly map it
-  to a registered capability.
+- **Stop hand-rolling execution control.** Delegate an objective and apply one
+  local Policy across all registered Skill actions.
 - **Make external actions safer.** Put policy checks before calls that can email,
   publish, refund, delete, pay, or modify user data.
-- **Keep permissions out of prompt glue.** Declare allowed, review-only, and
-  blocked capabilities in Pawprint instead of relying on model instructions.
+- **Keep permissions out of prompt glue.** Declare each Skill action as
+  `block`, `review`, `allow`, or `smart` in Pawprint instead of relying on
+  model instructions.
 - **Make execution inspectable.** Every goal attempt can return an action receipt
-  with the selected capability and execution envelope.
+  with the governed action, Policy result, and execution envelope.
 - **Keep your existing framework.** Insert Pawly before the tool or skill
   executor instead of rebuilding your agent loop.
-- **Run locally first.** Use deterministic Open Pawly policy checks offline,
-  then connect a cloud project when you want managed keys, team review, and
-  shared execution history.
+- **Stay local and extensible.** Use local adapters for Session, Context, Memory,
+  credentials, and audit without requiring a Cloud account.
 
 ## Core Concepts
 
@@ -107,8 +102,8 @@ Start with the agent, not with a tool wrapper. Create
 `agents/support_agent.pawprint.yaml` to describe what this agent is allowed to
 do when it reaches the execution layer.
 
-Keep the first version small: one safe action, one review-only action, and one
-action that should never run automatically.
+Keep the first version small: one safe action, one review action, and one
+action that should stay blocked.
 
 ```yaml
 metadata:
@@ -123,15 +118,15 @@ capabilities:
     description: Read order status for the current customer.
   - name: issue_refund
     description: Refund a customer account.
+  - name: delete_customer
+    description: Delete a customer record.
 
-boundaries:
-  allow:
-    - safe_reply
-    - lookup_order
-  review:
-    - issue_refund
-  block:
-    - delete_customer
+skills:
+  customer-support:
+    safe_reply: allow
+    lookup_order: allow
+    issue_refund: smart
+    delete_customer: block
 ```
 
 Validate it:
@@ -248,19 +243,11 @@ print(result.result)
 print(result.action_receipt)
 ```
 
-Pawly builds candidate actions for every registered local Skill action. It
-applies the Pawprint boundaries, scores the eligible actions, executes the selected Skill, and
-returns a receipt. The receipt shows which capability was selected, which
-boundary applied, and what was recorded for audit.
-
-`user_id` and `session_id` are optional in Open Pawly and standard in Pawly
-Cloud. Passing them lets Cloud make skill execution user-aware: it can use the
-end user's session, explicit choices, relevant memories, connected accounts,
-permission state, and recent outcomes when routing and executing Skills. If a
-Skill needs authorization, Cloud returns an
-`auth_required` status with a Hosted Auth URL and resumes the same session after
-authorization. Credentials stay behind runtime-only references and are not sent
-to prompts, model context, or ordinary traces.
+Pawly applies the Pawprint decision table across every registered local Skill
+action, blocks undeclared actions, enforces review where required, runs eligible
+work through the local execution boundary, and returns a receipt. Internal
+deterministic ordering is part of the local Policy path; it is not the Cloud
+Skill Discovery or Skill Selection product.
 
 The agent runtime can still use an LLM to understand the conversation and
 produce the structured plan. The production credentials stay behind the
@@ -273,13 +260,8 @@ it contains `objective`, `context`, and optional `constraints`. If the workflow
 is deterministic business logic, use the same shape from normal code; Pawly does
 not require an LLM.
 
-Open Pawly does not narrow local Skills before Policy evaluation. If a local
-registry has many Skills, `pawly.achieve(...)` sends all registered actions to
-the local Policy path; Cloud Starter is the first level that adds hosted Skill
-Discovery and basic Skill Selection before action schemas are exposed.
-
-Metadata can still be attached during local registration for receipts,
-developer tooling, and Cloud migration:
+Metadata can be attached during local registration for receipts and developer
+tooling:
 
 ```python
 registry.register(
@@ -294,12 +276,6 @@ registry.register(
 )
 ```
 
-Open Pawly uses local Policy over all registered actions for safety, not hosted
-Skill Discovery or Skill Selection. Pawly Cloud adds managed registry metadata, plan-aware
-filtering, Cloud Skill Discovery, Cloud Skill Selection, progressive disclosure, hosted authorization
-state, and richer trace statistics without changing the `pawly.achieve(...)`
-call.
-
 The same flow is available as a runnable example:
 
 ```bash
@@ -310,33 +286,12 @@ That example starts from `examples/agents/goal_first_support_agent.yaml`, binds
 the agent's real skills, creates an agent-runtime plan, and routes the support
 message through `pawly.achieve`.
 
-At first, a local audit file is usually enough. Cloud becomes useful when the
-agent is no longer just your local experiment: teammates need to see what ran,
-customers ask why an action happened, approvals need a shared place to live, or
-you want to add managed skills without maintaining another tool integration.
-Keep the same three service shape and connect only the parts you want to run
-through Pawly Cloud. Get a Cloud Starter project API key from
-[Pawly Developer](https://developer.aploy.ai/pawly).
+### Pawly Cloud
 
-```bash
-export PAWLY_API_KEY="paste_the_project_key"
-```
-
-```python
-import os
-from pawly import AuditService, HeuristicPolicy, PolicyService, SkillService
-
-api_key = os.getenv("PAWLY_API_KEY")
-
-skills = SkillService.local({"safe_reply": safe_reply})
-policy = PolicyService.cloud(api_key=api_key)
-audit = AuditService.cloud(api_key=api_key, local_path="./pawly-audit.jsonl")
-```
-
-That setup still keeps a local audit file, while the same run can appear in the
-project timeline for search, review, and handoff. If the key is missing, Pawly
-returns a configuration step with the console link instead of an unclear runtime
-failure.
+Open Pawly is complete as a local product and requires no Cloud account. Pawly
+Cloud is available separately for managed production infrastructure. See the
+[Pawly Cloud product page](https://developer.aploy.ai/pawly) for plan-specific
+capabilities.
 
 ### 3. Connect existing skills
 
@@ -376,22 +331,6 @@ If your framework already creates tool objects in code, pass those directly:
 skills=SkillService.from_openai_tools(openai_tools)
 ```
 
-Cloud uses the same `SkillService` slot. Use it when a skill should be selected,
-tested, or managed from the dashboard, or when an existing local skills folder
-should be brought into that workflow through an adapter:
-
-```python
-skills=SkillService.cloud(
-    api_key=os.getenv("PAWLY_API_KEY"),
-    directory="./skills",
-    adapter="pawly",
-)
-```
-
-Marketplace skills are selected in the dashboard, so the SDK does not need a
-manual skill-id list. Local folders still require an explicit adapter because
-Pawly should read a known format instead of guessing.
-
 ## Developer API
 
 The developer-facing integration surface is goal-first:
@@ -430,8 +369,7 @@ Common statuses:
 | --- | --- |
 | `completed` | A matching local skill ran successfully. |
 | `unsupported_goal` | No registered skill matched the delegated objective. |
-| `auth_required` | Pawly Cloud selected a Skill but needs the end user to connect an account or grant a required scope before the same session can resume. |
-| `configuration_required` | A Pawprint path or cloud key is missing; the receipt includes the next step. |
+| `configuration_required` | A Pawprint path or required local configuration is missing; the receipt includes the next step. |
 | `failed` | Local execution failed or was blocked. |
 
 ## Architecture
@@ -446,16 +384,14 @@ Agent runtime
 Pawly
     |-- Pawprint boundary
     |-- Skill registry
-    |-- Candidate builder
-    |-- Policy routing
+    |-- Policy evaluation across registered actions
     |-- Execution/audit receipt
     v
 Local skill executor
 ```
 
-The package intentionally has no dependency on cloud services. Managed
-planning, credential brokering, marketplace access, and organization governance
-are optional integrations, not Open Pawly runtime requirements.
+The package intentionally has no required network service. Your application owns
+planning, credentials, and deployment; Pawly owns the local execution boundary.
 
 ## Adapters
 
@@ -479,9 +415,7 @@ See [`src/pawly/adapters/README.md`](src/pawly/adapters/README.md) and
 - [Audit and replay](docs/audit_and_replay.md)
 - [Pawprint policy engine](docs/pawprint_policy_engine.md)
 - [Protected skills](docs/protected_skills.md)
-- [Project status](docs/status.md)
-- [Open Pawly vs Pawly Cloud](docs/oss_vs_cloud.md)
-- [Pawly capability levels](../../docs/pawly_capability_levels.md)
+- [Open Pawly and Pawly Cloud](docs/oss_vs_cloud.md)
 
 ## Development
 
@@ -500,7 +434,7 @@ python -m pytest tests/test_goal_interface.py tests/test_run_actions.py tests/te
 ## Contributing
 
 Issues and pull requests are welcome. For code changes, include focused tests and
-keep cloud-service behavior out of the Open Pawly runtime. If a change affects
+keep network-dependent behavior out of the Open Pawly runtime. If a change affects
 the Pawprint contract, update the sibling `pawprint` package and relevant docs
 in the same patch.
 

@@ -1,5 +1,7 @@
 # Content Agent Demo Tasks
 
+**[OSS Example] Runs locally with Open Pawly; no Cloud account required.**
+
 ## In-scope tasks
 
 - draft email copy

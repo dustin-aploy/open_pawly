@@ -1,5 +1,7 @@
 # Example Design Principles
 
+**[OSS Example]** These principles apply to local Open Pawly examples; no Cloud account is required.
+
 These examples are designed to be:
 
 1. **Realistic** — they model bounded roles that a real organization might deploy.

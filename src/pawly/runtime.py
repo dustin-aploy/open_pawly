@@ -143,11 +143,20 @@ class DecisionEngine:
     ) -> ActionDecision:
         pawprint = pawprint_config or self.pawprint_config
         classified = _classify_actions(actions, pawprint)
-        smart_decisions = self.smart_policy.decide(state, classified["smart"])
+        scoring_resolution = _resolve_scoring_policy(self)
+        smart_decisions = _decide_smart_actions(
+            fallback_policy=self.smart_policy,
+            cloud_policy=scoring_resolution["policy"],
+            state=state,
+            actions=classified["smart"],
+        )
+        smart_decision_metadata = {
+            action.name: dict(getattr(decision, "metadata", {}) or {})
+            for action, decision in zip(classified["smart"], smart_decisions, strict=False)
+        }
         for action, decision in zip(classified["smart"], smart_decisions):
             bucket = "blocked" if decision.decision == "block" else decision.decision
             classified[bucket].append(action)
-        scoring_resolution = _resolve_scoring_policy(self)
 
         allowed_candidates = _build_candidates(
             actions=classified["allow"],
@@ -203,6 +212,8 @@ class DecisionEngine:
             allowed_actions=allowed_candidates,
             review_required_actions=review_candidates,
             blocked_actions=blocked_actions,
+            smart_actions=[action.name for action in classified["smart"]],
+            smart_decision_metadata=smart_decision_metadata,
         )
         self.log_decision(decision)
         return decision
@@ -474,6 +485,7 @@ class DecisionEngine:
             },
             execution_result_ref=None,
             risk_score=_selected_risk_score(decision),
+            risk_source=_selected_risk_source(decision),
             escalated_to=None,
             tenant_id=_actor_value(state, "tenant_id"),
             user_id=_actor_value(state, "user_id"),
@@ -540,6 +552,62 @@ def _classify_actions(actions: Sequence[Action], pawprint: PawprintConfig) -> di
         else:
             buckets["blocked"].append(action)
     return buckets
+
+
+def _decide_smart_actions(
+    *,
+    fallback_policy: HeuristicSmartPolicy,
+    cloud_policy: Policy,
+    state: Mapping[str, Any] | None,
+    actions: Sequence[Action],
+) -> list[Any]:
+    """Use managed smart decisions when available; local heuristics remain the fallback."""
+    if not actions:
+        return []
+    decide_smart = getattr(cloud_policy, "decide_smart", None)
+    if not callable(decide_smart):
+        return _local_smart_fallback(fallback_policy, state, actions)
+    try:
+        raw_decisions = decide_smart(state, actions)
+        if not isinstance(raw_decisions, Sequence) or len(raw_decisions) != len(actions):
+            raise ValueError("incomplete_cloud_smart_decisions")
+        resolved = []
+        for item in raw_decisions:
+            if not isinstance(item, Mapping):
+                raise ValueError("invalid_cloud_smart_decision")
+            disposition = str(item.get("decision") or "").strip().lower()
+            if disposition not in {"allow", "review", "block"}:
+                raise ValueError("invalid_cloud_smart_disposition")
+            resolved.append(
+                type("CloudSmartDecision", (), {
+                    "decision": disposition,
+                    "reason_code": str(item.get("reason") or "cloud_smart_policy"),
+                    "confidence": max(0.0, min(1.0, 1.0 - float(item.get("uncertainty") or 0.0))),
+                    "source": "cloud",
+                    "metadata": dict(item.get("metadata") or {}),
+                })()
+            )
+        return resolved
+    except Exception as exc:
+        LOGGER.warning("managed smart policy unavailable; using local heuristic: %s", type(exc).__name__)
+        return _local_smart_fallback(fallback_policy, state, actions)
+
+
+def _local_smart_fallback(
+    fallback_policy: HeuristicSmartPolicy,
+    state: Mapping[str, Any] | None,
+    actions: Sequence[Action],
+) -> list[Any]:
+    return [
+        type("LocalSmartDecision", (), {
+            "decision": decision.decision,
+            "reason_code": decision.reason_code,
+            "confidence": decision.confidence,
+            "source": "fallback",
+            "metadata": {"degraded": True, "logging_policy": "local_heuristic_v1"},
+        })()
+        for decision in fallback_policy.decide(state, actions)
+    ]
 
 
 def _build_candidates(
@@ -857,6 +925,21 @@ def _selected_risk_score(decision: ActionDecision) -> float | None:
     if candidate is None:
         return None
     return candidate.score.risk_score
+
+
+def _selected_risk_source(decision: ActionDecision) -> str | None:
+    candidate = _selected_candidate(decision)
+    if candidate is None:
+        return None
+    # A smart disposition is a learned business-outcome decision. This remains
+    # distinct from the operational score used for ordinary action ordering.
+    smart_metadata = decision.smart_decision_metadata.get(candidate.action.name, {})
+    if smart_metadata.get("score_semantics") == "conservative_expected_loss_ascending":
+        return "business_decision"
+    for tag in candidate.score.audit_tags:
+        if tag.startswith("risk:"):
+            return tag.split(":", 1)[1]
+    return "operational"
 
 
 def _build_run_actions_request_payload(

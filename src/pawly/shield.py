@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 import re
 from typing import Any
 
 from pawly.action_selection import ActionCandidate
-from pawly.contracts import Action, PolicyScore
+from pawly.contracts import Action
 from pawly.pawprint_loader import PawprintConfig
 
-_EXTERNAL_WRITE_TERMS = frozenset({"delete", "email", "message", "post", "purchase", "send", "transfer", "update"})
 _PROMPT_INJECTION_PATTERNS = (
     r"ignore previous instructions",
     r"reveal system prompt",
@@ -125,60 +124,11 @@ class ShieldPolicy:
         pawprint: PawprintConfig,
         state: dict[str, Any] | None = None,
     ) -> tuple[str, ActionCandidate, list[str]]:
-        envelope = self.envelope_for(pawprint)
-        reasons: list[str] = []
-        action = candidate.action
-        risk_score = 1.0 if candidate.score.risk_score is None else float(candidate.score.risk_score)
-        action_name = action.name.strip().lower()
-        action_text = _flatten_value(action.arguments).lower()
-        actor_context = _actor_context(state)
-
-        requires_review = candidate.requires_review
-        boundary_type = candidate.boundary_type
-
-        is_external_write = "external_write" in envelope.assets and _looks_like_external_write(action_name)
-        if is_external_write and envelope.execution.approval in {"external_write", "always"}:
-            requires_review = True
-            boundary_type = "review"
-            reasons.append("external_write_requires_review")
-
-        if _contains_secret(action_text):
-            risk_score = max(risk_score, 0.92)
-            reasons.append("secret_like_argument_detected")
-            if envelope.level == "confidential":
-                return "block", _replace_candidate(candidate, boundary_type="blocked", requires_review=True, risk_score=risk_score, reasons=reasons), reasons
-            requires_review = True
-            boundary_type = "review"
-
-        if _contains_prompt_injection(action_text):
-            risk_score = max(risk_score, 0.8)
-            reasons.append("prompt_injection_pattern_detected")
-            if envelope.level in {"protected", "confidential"} or envelope.handling == "strict":
-                requires_review = True
-                boundary_type = "review"
-
-        if envelope.execution.approval == "high_risk" and risk_score >= 0.8:
-            requires_review = True
-            boundary_type = "review"
-            reasons.append("high_risk_requires_review")
-
-        if envelope.execution.approval == "always":
-            requires_review = True
-            boundary_type = "review"
-            reasons.append("always_requires_review")
-
-        if is_external_write and envelope.level in {"protected", "confidential"} and not actor_context["has_identity"]:
-            requires_review = True
-            boundary_type = "review"
-            reasons.append("missing_actor_context_requires_review")
-
-        if envelope.level == "confidential" and risk_score >= 0.9:
-            reasons.append("confidential_high_risk_requires_review")
-            requires_review = True
-            boundary_type = "review"
-
-        updated = _replace_candidate(candidate, boundary_type=boundary_type, requires_review=requires_review, risk_score=risk_score, reasons=reasons)
-        return ("review" if requires_review else "allow"), updated, reasons
+        del pawprint, state
+        # Pawprint is the authorization contract. Shield protects data on the
+        # way in and out, but does not reinterpret an explicit allow/review/block
+        # boundary from a heuristic operational score or missing metadata.
+        return ("review" if candidate.requires_review else "allow"), candidate, []
 
     def sanitize_action(self, action: Action, envelope: ShieldEnvelope) -> tuple[Action, list[str]]:
         redactions: list[str] = []
@@ -320,23 +270,6 @@ def _apply_handling_adjustments(envelope: ShieldEnvelope) -> ShieldEnvelope:
     )
 
 
-def _replace_candidate(candidate: ActionCandidate, *, boundary_type: str, requires_review: bool, risk_score: float, reasons: list[str]) -> ActionCandidate:
-    score = PolicyScore(
-        risk_score=round(min(1.0, max(0.0, risk_score)), 4),
-        reason_codes=list(dict.fromkeys([*candidate.score.reason_codes, *reasons])),
-        matched_rules=list(candidate.score.matched_rules),
-        audit_tags=list(dict.fromkeys([*candidate.score.audit_tags, *[f"shield:{reason}" for reason in reasons]])),
-        uncertainty=candidate.score.uncertainty,
-    )
-    reason = reasons[0] if reasons else candidate.reason
-    return replace(candidate, boundary_type=boundary_type, requires_review=requires_review, score=score, reason=reason)
-
-
-def _looks_like_external_write(action_name: str) -> bool:
-    tokens = set(action_name.replace("-", " ").replace("_", " ").split())
-    return bool(tokens & _EXTERNAL_WRITE_TERMS)
-
-
 def _contains_prompt_injection(text: str) -> bool:
     return any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in _PROMPT_INJECTION_PATTERNS)
 
@@ -420,17 +353,3 @@ def _flatten_value(value: Any) -> str:
     if isinstance(value, list):
         return " ".join(_flatten_value(item) for item in value)
     return str(value)
-
-
-def _actor_context(state: dict[str, Any] | None) -> dict[str, bool]:
-    if not isinstance(state, dict):
-        return {"has_identity": False}
-    actor = state.get("actor")
-    if not isinstance(actor, dict):
-        return {"has_identity": False}
-    tenant_id = str(actor.get("tenant_id", "")).strip()
-    agent_id = str(actor.get("agent_id", "")).strip()
-    user_id = str(actor.get("user_id", "")).strip()
-    return {
-        "has_identity": bool(tenant_id or agent_id or user_id),
-    }

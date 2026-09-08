@@ -1,16 +1,16 @@
-# Internal: candidate-action routing
+# Advanced Candidate-Action Policy Control
 
 In this document `pawly` means the open-source package published from `open_pawly`.
 
-Pawly supports a candidate-action path that keeps decision and selected-action
-execution inside `DecisionEngine`. This is primarily for framework adapters and
-runtime maintainers.
+Pawly supports a lower-level path that applies local Policy to candidate actions
+already supplied by an adapter or application. This is not Open Pawly Skill
+Discovery or Skill Selection as a product capability.
 
 Most application developers should use `Pawly(...).achieve(...)`, where Pawly
-builds candidate actions from registered skills before calling this lower-level
-path internally.
+applies local Policy across registered Skill actions before calling this
+lower-level path.
 
-## Internal adapter usage
+## Adapter usage
 
 ```python
 from pawly import DecisionEngine, HeuristicPolicy, SkillRegistry, load_pawprint_file
@@ -111,7 +111,7 @@ Supported fields:
 - `assets`:
   - `customer_data`
   - `private_knowledge`
-  - `internal_workflow`
+  - `business_workflow`
   - `paid_api`
   - `external_write`
 - `handling`: `auto | cautious | strict`
@@ -131,16 +131,16 @@ This version protects the boundary around selected-action execution inside Pawly
 
 - candidate action decision protection
 - action argument inspection/sanitization before execution
-- internal execution through `SkillRegistry`
+- execution through `SkillRegistry`
 - output inspection/redaction after execution
 - audit metadata
 
 This version does not protect:
 
-- skill-internal model calls
-- skill-internal RAG calls
-- skill-internal external API calls
-- internal skill traces
+- model calls made inside a Skill
+- retrieval calls made inside a Skill
+- external API calls made inside a Skill
+- traces produced inside a Skill
 - tool calls that bypass the registered `SkillRegistry`
 
 This version does not implement:
@@ -162,9 +162,3 @@ result = skills.execute(decision.selected_action, context)
 ```
 
 That remains useful for advanced control, but it is not the recommended default integration.
-
-## Future path
-
-- V1: decision + internal selected-action execution + boundary Shield
-- V2: optional gateway protection for internal model/RAG/tool calls
-- V3: phase-aware native protection for official or high-value skills

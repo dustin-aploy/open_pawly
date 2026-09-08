@@ -1,3 +1,5 @@
+"""[OSS Example] Local Open Pawly adapter integration; no Cloud account required."""
+
 from __future__ import annotations
 
 import json

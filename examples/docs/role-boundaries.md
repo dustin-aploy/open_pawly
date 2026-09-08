@@ -1,5 +1,7 @@
 # Role Boundaries
 
+**[OSS Example]** This guide supports local Open Pawly examples; no Cloud account is required.
+
 A good Pawprint example does not describe a generic “helpful AI assistant.” It describes a bounded organizational role.
 
 ## What role boundaries should show

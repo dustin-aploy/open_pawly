@@ -1,4 +1,8 @@
-# Pawly Examples
+# Open Pawly Examples
+
+All examples in this directory are **[OSS Examples]**. They run locally and do
+not require a Pawly Cloud account, Hosted Auth, Credential Vault, Cloud Skill
+Discovery, Cloud Skill Selection, or Progressive Disclosure.
 
 - `goal_first_support_agent.py`: recommended agent-runtime flow. The agent
   returns a structured plan, and `pawly.achieve(**plan)` is the only execution
@@ -9,6 +13,6 @@
   definitions so they can be registered behind Pawly.
 - `execution_gateway_demo.py`: advanced migration example for protecting an
   already-selected action.
-- `run_actions_basic.py`: internal candidate-action routing example for adapter
+- `run_actions_basic.py`: candidate-action routing example for adapter authors
   maintainers, not the normal application integration.
 - `agents/`: example Pawprint declarations.

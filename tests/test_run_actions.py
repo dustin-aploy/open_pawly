@@ -196,7 +196,7 @@ skills:
         self.assertEqual(result["status"], "blocked")
         self.assertIsNone(result["result"])
 
-    def test_run_actions_returns_needs_review_when_decision_requires_review(self) -> None:
+    def test_allow_boundary_executes_normal_external_message(self) -> None:
         runtime, _ = self._make_runtime(PROTECTED_WORKER)
         registry = SkillRegistry()
         registry.register("send_external_message", lambda args, context: {"sent": True})
@@ -208,8 +208,8 @@ skills:
             context={},
         )
 
-        self.assertEqual(result["status"], "needs_review")
-        self.assertIsNone(result["result"])
+        self.assertEqual(result["status"], "completed")
+        self.assertTrue(result["result"]["sent"])
 
     def test_run_actions_raises_when_skill_registry_is_missing(self) -> None:
         runtime, _ = self._make_runtime(BASIC_WORKER)
@@ -273,7 +273,7 @@ skills:
         self.assertEqual(result["status"], "blocked")
         self.assertIsNone(result["result"])
 
-    def test_confidential_external_write_strict_requires_review_before_execution(self) -> None:
+    def test_confidential_protection_does_not_override_allow_boundary(self) -> None:
         runtime, _ = self._make_runtime(CONFIDENTIAL_WORKER)
         registry = SkillRegistry()
         registry.register("safe_reply", lambda args, context: {"body": "ok"})
@@ -285,8 +285,7 @@ skills:
             context={},
         )
 
-        self.assertEqual(result["status"], "needs_review")
-        self.assertIn("always_requires_review", result["decision"]["protection"]["reasons"])
+        self.assertEqual(result["status"], "completed")
 
     def test_failed_skill_execution_returns_safe_error(self) -> None:
         runtime, _ = self._make_runtime(BASIC_WORKER)
@@ -367,16 +366,16 @@ skills:
         events = runtime.audit_sink.load_events()
         self.assertEqual(events[0]["original_intent"]["selected_action"]["arguments"]["message"], "hello")
 
-    def test_protected_external_write_without_actor_context_requires_review(self) -> None:
+    def test_protected_external_write_without_actor_context_keeps_allow_boundary(self) -> None:
         runtime, _ = self._make_runtime(PROTECTED_WORKER)
         decision = runtime.decide_actions(
             {},
             [Action(name="send_external_message", arguments={"to": "user@example.com"})],
         )
-        self.assertTrue(decision.requires_review)
-        self.assertIn("missing_actor_context_requires_review", decision.to_dict()["protection"]["reasons"])
+        self.assertFalse(decision.requires_review)
+        self.assertEqual(decision.selected_action.name, "send_external_message")
 
-    def test_run_actions_with_approval_backend_returns_review_payload(self) -> None:
+    def test_allow_boundary_does_not_create_approval_from_operation_risk(self) -> None:
         runtime, _ = self._make_runtime(PROTECTED_WORKER)
         registry = SkillRegistry()
         registry.register("send_external_message", lambda args, context: {"sent": True})
@@ -389,12 +388,10 @@ skills:
             context={},
         )
 
-        self.assertEqual(result["status"], "needs_review")
-        self.assertIn("approval", result)
-        self.assertEqual(result["approval"]["status"], "pending")
-        self.assertEqual(result["approval"]["proposed_action"]["name"], "send_external_message")
+        self.assertEqual(result["status"], "completed")
+        self.assertNotIn("approval", result)
 
-    def test_run_actions_with_auto_approved_backend_executes_reviewed_action(self) -> None:
+    def test_allow_boundary_executes_without_approval_backend_decision(self) -> None:
         runtime, _ = self._make_runtime(PROTECTED_WORKER)
         registry = SkillRegistry()
         registry.register("send_external_message", lambda args, context: {"sent": True, "to": args["to"]})
@@ -416,8 +413,7 @@ skills:
         )
 
         self.assertEqual(result["status"], "completed")
-        self.assertIn("approval", result)
-        self.assertEqual(result["approval"]["status"], "approved")
+        self.assertNotIn("approval", result)
         self.assertTrue(result["result"]["sent"])
 
 

@@ -46,6 +46,8 @@ class ActionDecision:
     allowed_actions: list[ActionCandidate] = field(default_factory=list)
     review_required_actions: list[ActionCandidate] = field(default_factory=list)
     blocked_actions: list[Action] = field(default_factory=list)
+    smart_actions: list[str] = field(default_factory=list)
+    smart_decision_metadata: dict[str, dict[str, object]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -61,4 +63,8 @@ class ActionDecision:
             "allowed_actions": [candidate.to_dict() for candidate in self.allowed_actions],
             "review_required_actions": [candidate.to_dict() for candidate in self.review_required_actions],
             "blocked_actions": [action.to_dict() for action in self.blocked_actions],
+            "smart_actions": list(self.smart_actions),
+            "smart_decision_metadata": {
+                name: dict(metadata) for name, metadata in self.smart_decision_metadata.items()
+            },
         }

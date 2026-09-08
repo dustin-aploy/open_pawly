@@ -56,6 +56,44 @@ class HeuristicPolicyTests(unittest.TestCase):
         self.assertIn("recent_failure", score.reason_codes)
         self.assertGreaterEqual(score.risk_score, 0.7)
 
+    def test_known_chat_reply_with_callback_keyboard_is_low_risk(self):
+        policy = HeuristicPolicy()
+        score = policy.evaluate(
+            {},
+            [
+                Action(
+                    name="telegram.send_message",
+                    arguments={
+                        "chat_id": "chat-1",
+                        "text": "Choose a next step",
+                        "reply_markup": {"inline_keyboard": [[{"text": "Continue", "callback_data": "flow.continue"}]]},
+                    },
+                )
+            ],
+        )[0]
+        self.assertEqual(score.risk_score, 0.18)
+        self.assertIn("known_message_recipient", score.reason_codes)
+        self.assertIn("interactive_reply", score.reason_codes)
+
+    def test_known_chat_reply_with_login_button_has_elevated_risk(self):
+        policy = HeuristicPolicy()
+        score = policy.evaluate(
+            {},
+            [
+                Action(
+                    name="telegram.send_message",
+                    arguments={
+                        "chat_id": "chat-1",
+                        "text": "Connect your account",
+                        "reply_markup": {"inline_keyboard": [[{"text": "Connect", "login_url": {"url": "https://example.com/login"}}]]},
+                    },
+                )
+            ],
+        )[0]
+        self.assertEqual(score.risk_score, 0.6)
+        self.assertIn("external_link_in_reply", score.reason_codes)
+        self.assertIn("embedded_app_or_login", score.reason_codes)
+
 
 if __name__ == "__main__":
     unittest.main()

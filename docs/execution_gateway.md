@@ -47,7 +47,7 @@ The default reviewer is `rules`.
 
 That means:
 - deterministic Pawprint policy evaluation
-- no cloud dependency
+- no required network dependency
 - no model-based review in the Open Pawly execution path
 
 ## Host runtime boundary

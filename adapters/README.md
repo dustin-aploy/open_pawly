@@ -1,4 +1,7 @@
-# Paw Adapters
+# Pawly Adapters
+
+**Product scope: [OSS].** These are local Open Pawly extension points, not
+Cloud Skill Discovery or Skill Selection.
 
 The public adapter implementation now lives in `src/pawly/adapters`.
 

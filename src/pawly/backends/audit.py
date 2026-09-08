@@ -148,6 +148,38 @@ def _build_hosted_action_sync() -> HostedActionSyncAuditSink | None:
 def _action_ingest_payload(event: dict[str, Any]) -> dict[str, Any]:
     final_decision = event.get("final_decision") if isinstance(event.get("final_decision"), dict) else {}
     policy_evaluation = event.get("policy_evaluation") if isinstance(event.get("policy_evaluation"), dict) else {}
+    action = dict(event.get("executed_action") or event.get("action") or {})
+    argument_summary = event.get("action_argument_summary")
+    if isinstance(argument_summary, dict) and argument_summary and not action.get("arguments"):
+        action["action_argument_summary"] = argument_summary
+    intent = event.get("original_intent") if isinstance(event.get("original_intent"), dict) else {}
+    intent_metadata = intent.get("metadata") if isinstance(intent.get("metadata"), dict) else {}
+    intent_context = intent.get("context") if isinstance(intent.get("context"), dict) else {}
+    audit_interaction = intent_context.get("audit_interaction") if isinstance(intent_context.get("audit_interaction"), dict) else {}
+    execution = event.get("execution") if isinstance(event.get("execution"), dict) else {}
+    result = execution.get("result") if isinstance(execution.get("result"), dict) else {}
+    action_arguments = action.get("arguments") if isinstance(action.get("arguments"), dict) else {}
+    context_messages = (
+        audit_interaction.get("context_messages")
+        or intent_metadata.get("context_messages")
+        or intent_metadata.get("conversation_history")
+        or intent_metadata.get("messages")
+        or []
+    )
+    # Keep an individual receipt useful without repeatedly uploading an entire
+    # conversation. The hosted audit keeps only new turns across decisions.
+    if isinstance(context_messages, list):
+        context_messages = context_messages[-6:]
+    interaction = {
+        "interaction_id": audit_interaction.get("interaction_id") or intent_metadata.get("interaction_id") or event.get("request_id") or "",
+        "operation_id": audit_interaction.get("operation_id") or intent_metadata.get("operation_id") or execution.get("execution_id") or event.get("decision_id"),
+        "channel_id": audit_interaction.get("channel_id") or intent_metadata.get("channel_id") or intent_metadata.get("channel") or execution.get("channel_id") or "runtime",
+        "channel_message_id": audit_interaction.get("channel_message_id") or intent_metadata.get("channel_message_id") or intent_metadata.get("message_id") or execution.get("message_id") or event.get("event_id"),
+        "incoming_message": audit_interaction.get("incoming_message") or intent_metadata.get("incoming_message") or intent_metadata.get("user_message") or intent.get("summary") or "",
+        "context_messages": context_messages if isinstance(context_messages, list) else [],
+        "reply_message": result.get("text") or result.get("message") or action_arguments.get("text") or action_arguments.get("message") or "",
+        "reply_markup": result.get("reply_markup") or action_arguments.get("reply_markup") or {},
+    }
     return {
         "event_id": event.get("event_id"),
         "decision_id": event.get("decision_id"),
@@ -155,10 +187,13 @@ def _action_ingest_payload(event: dict[str, Any]) -> dict[str, Any]:
         "event_type": event.get("event_type"),
         "outcome": event.get("outcome"),
         "agent_id": event.get("agent_id"),
-        "action": dict(event.get("executed_action") or event.get("action") or {}),
+        "action": action,
         "executed_action": event.get("executed_action"),
         "risk_score": event.get("risk_score"),
+        "risk_source": event.get("risk_source"),
         "request_id": event.get("request_id"),
+        "interaction_id": interaction["interaction_id"],
+        "operation_id": interaction["operation_id"],
         "metadata": {
             "reason_codes": event.get("reason_codes") or [],
             "matched_rules": event.get("matched_policy_rules") or event.get("matched_rules") or [],
@@ -178,6 +213,7 @@ def _action_ingest_payload(event: dict[str, Any]) -> dict[str, Any]:
             "output_summary": event.get("output_summary") or {},
             "execution_result_ref": event.get("execution_result_ref"),
             "environment": event.get("tenant_id") or "",
+            "interaction": interaction,
         },
     }
 
