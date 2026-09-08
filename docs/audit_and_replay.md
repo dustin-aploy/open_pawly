@@ -22,6 +22,26 @@ Each `governed-execution` event stores:
 - execution result reference when one is available
 - action diff between proposed and executed action
 
+## Interaction snapshot
+
+An application can attach enough interaction context for a developer to judge an
+action without reconstructing the conversation elsewhere:
+
+- `channel_id` and `channel_message_id`
+- the immediately preceding conversation in `context_messages`, as a list of
+  `{ "role": "user" | "assistant" | "system", "text": "..." }` objects
+- the inbound user message in `incoming_message`
+- the proposed or delivered response in `reply_message`
+- Telegram-style `reply_markup.inline_keyboard` when the response contains choices
+
+Integrations should set these fields when they own the channel transport. Keep
+only the messages needed to understand the current request. A receipt can then
+be rendered as a conversation timeline: earlier messages, the current request,
+Pawly's proposed action, the delivered reply, and the reply buttons.
+
+Sensitive credentials and protected-skill payloads must remain redacted; do not place
+them in the interaction snapshot.
+
 ## Main modules
 
 - `open_pawly/src/pawly/audit/events.py`

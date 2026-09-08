@@ -1,7 +1,8 @@
+"""[OSS Example] Local Open Pawly goal-first execution; no Cloud account required."""
+
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any, NotRequired, TypedDict
 
@@ -67,7 +68,6 @@ def plan_from_business_logic(user_message: str, *, order_id: str, customer_id: s
 
 
 def main() -> int:
-    api_key = os.getenv("PAWLY_API_KEY")
     pawly = Pawly(
         str(PAWPRINT_PATH),
         skills=SkillService.local(
@@ -77,10 +77,8 @@ def main() -> int:
                 "issue_refund": issue_refund,
             }
         ),
-        policy=PolicyService.local() if not api_key else PolicyService.cloud(api_key=api_key),
-        audit=AuditService.local("./pawly-audit.jsonl")
-        if not api_key
-        else AuditService.cloud(api_key=api_key, local_path="./pawly-audit.jsonl"),
+        policy=PolicyService.local(),
+        audit=AuditService.local("./pawly-audit.jsonl"),
     )
     plan = plan_from_business_logic(
         "I was charged twice. Can you refund me?",

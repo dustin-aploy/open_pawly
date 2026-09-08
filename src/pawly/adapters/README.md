@@ -1,5 +1,7 @@
 # Pawly Public Adapters
 
+**Product scope: [OSS].**
+
 `pawly.adapters` is the single public adapter surface for framework and transport wrappers.
 
 Use these modules when you need to insert Pawly checks at an execution boundary without

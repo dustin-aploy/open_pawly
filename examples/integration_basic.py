@@ -1,3 +1,5 @@
+"""[OSS Example] Local lower-level Open Pawly integration; no Cloud account required."""
+
 from __future__ import annotations
 
 import json
@@ -5,11 +7,6 @@ from pathlib import Path
 
 from pawly import Action, HeuristicPolicy, load_pawprint_file
 from pawly.runtime import DecisionEngine
-
-try:
-    from pawly_cloud import CloudPolicy
-except ImportError:
-    CloudPolicy = None
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -55,26 +52,6 @@ def main() -> int:
     print("\nLocal Pawly decision without pawly-cloud:")
     print(json.dumps(_decision_payload(local_runtime, local_decision), indent=2, sort_keys=True))
 
-    if CloudPolicy is None:
-        print("\nOptional CloudPolicy integration:")
-        print(json.dumps({"status": "pawly-cloud not installed; local Pawly path works offline"}, indent=2, sort_keys=True))
-        return 0
-
-    cloud_policy = CloudPolicy(api_key="", endpoint="", fallback_policy=HeuristicPolicy())
-    if not cloud_policy.is_scoring_available():
-        print("\nOptional CloudPolicy integration:")
-        print(
-            "CloudPolicy is installed but credentials are missing. "
-            "Falling back to local heuristic behavior without crashing."
-        )
-
-    cloud_runtime = DecisionEngine(
-        PAWPRINT_PATH,
-        scoring_policy=cloud_policy,
-    )
-    cloud_decision = cloud_runtime.decide_actions(state, [Action(name="publish_post", arguments={"draft_id": "post-42"})], loaded.config)
-
-    print(json.dumps(_decision_payload(cloud_runtime, cloud_decision), indent=2, sort_keys=True))
     return 0
 
 

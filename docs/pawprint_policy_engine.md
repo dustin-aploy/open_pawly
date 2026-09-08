@@ -1,101 +1,45 @@
 # Pawprint Policy Engine
 
-In this document `pawly` means the open-source package published from `open_pawly`.
-
-The Open Pawly path now has one deterministic Pawprint policy engine entrypoint:
-
-`evaluate_pawprint(intent, pawprint)`
-
-It accepts:
-- a normalized `Intent`
-- a developer-authored `Pawprint`
-
-It returns a deterministic policy evaluation with:
-- decision type candidate
-- reason codes
-- matched rules
-- risk score
-
-## Purpose
-
-This engine is the central rule evaluator for the open-source path. It is rule-based only.
-
-It does not call models.
-It does not depend on cloud services.
-It does not rewrite planner logic.
-It does not introduce an approval queue.
+The Pawprint policy engine evaluates the action boundary declared by a
+developer. It is deterministic and runs locally.
 
 ## Inputs
 
-### Intent
+The engine receives a normalized execution request and a Pawprint. The
+recommended Pawprint form is a generated Skill/action table:
 
-Intent is an internal normalized execution object. It may come from:
-- tool calls
-- planner outputs
-- execution requests
+```yaml
+skills:
+  customer-support:
+    get_order_status: allow
+    issue_refund: smart
+    export_customer_data: block
+```
 
-The engine evaluates the normalized action, summary, confidence, and metadata already attached to that Intent.
+Every action has one decision: `block`, `review`, `allow`, or `smart`.
+Undeclared actions are blocked.
 
-### Pawprint
+## Evaluation order
 
-Pawprint remains the small developer-facing worker card:
-- identity
-- role
-- capabilities
-- boundaries
-- handoff conditions
-- style
+1. Match the requested action against the Pawprint table.
+2. Apply explicit `block`, `review`, and `allow` decisions.
+3. Resolve `smart` with the configured local policy.
+4. Return an executable decision or an approval requirement.
 
-The engine reads only the policy-relevant parts:
-- `capabilities`
-- `boundaries.allow`
-- `boundaries.review`
-- `boundaries.block`
-- `handoff.when`
-- `handoff.to`
+The built-in smart policy reads structured context, action arguments, risk hints,
+verification signals, and amount limits. It returns `block`, `review`, or
+`allow` without a model call. Applications can supply their own policy for
+`smart` actions when their domain needs additional business rules.
 
-## Rule Coverage
+## Guarantees
 
-The engine currently evaluates:
-- capability match vs capability mismatch
-- `allow`, `review`, and `block` boundaries
-- handoff trigger conditions
-- obvious boundary violations through deterministic text and token matching
-- low-confidence handoff trigger when confidence is present and below threshold
+- Explicit `block` actions are never candidates for execution.
+- `review` actions still require approval after local Policy evaluation.
+- A policy cannot invent an action that is absent from Pawprint.
+- The returned receipt includes the decision, reason, and governed action.
 
-If a cloud-assisted decision path is unavailable, the Open Pawly path still falls back to the deterministic rule-based evaluation described here.
+## Compatibility API
 
-## Decision Recommendation
-
-The engine returns a candidate decision type:
-- `allow`
-- `deny`
-- `require_approval`
-- `simulate` when the normalized request explicitly asks for simulation, for example through `metadata.simulate=true`
-
-Current precedence is:
-1. `block` boundary
-2. `review` boundary
-3. handoff trigger
-4. capability mismatch
-5. allow
-
-## Risk Scoring
-
-Risk scoring is deterministic and local.
-
-The current rule-based score considers:
-- `review` matches
-- `block` matches
-- handoff-triggering categories
-- capability mismatch
-- obvious external side effects
-- low confidence when present
-
-This score is advisory runtime output for the Open Pawly path. It is not model-based review.
-
-## Core Boundary
-
-This engine is the central Open Pawly policy path.
-
-Modules like budget, memory, and performance may still exist around the runtime, but they are not the policy engine and should not define the core execution-boundary architecture.
+`evaluate_pawprint(intent, pawprint)` remains available for integrations that
+already provide a normalized `Intent`. New goal-oriented integrations should use
+`Pawly(...).achieve(...)`.

@@ -29,6 +29,7 @@ class AuditEvent:
     execution: dict[str, Any] | None = None
     execution_result_ref: str | None = None
     risk_score: float | None = None
+    risk_source: str | None = None
     request_id: str | None = None
     escalated_to: str | None = None
     tenant_id: str | None = None
@@ -59,6 +60,7 @@ class AuditEvent:
         final_decision: dict[str, Any],
         reason_codes: list[str],
         risk_score: float | None,
+        risk_source: str | None = None,
         escalated_to: str | None,
     ) -> "AuditEvent":
         return cls(
@@ -79,6 +81,7 @@ class AuditEvent:
             final_decision=final_decision,
             reason_codes=reason_codes,
             risk_score=risk_score,
+            risk_source=risk_source,
             escalated_to=escalated_to,
             redactions_applied=[],
         )
@@ -106,6 +109,7 @@ class AuditEvent:
         execution: dict[str, Any],
         execution_result_ref: str | None,
         risk_score: float | None,
+        risk_source: str | None = None,
         escalated_to: str | None,
         tenant_id: str | None = None,
         user_id: str | None = None,
@@ -139,6 +143,7 @@ class AuditEvent:
             execution=execution,
             execution_result_ref=execution_result_ref,
             risk_score=risk_score,
+            risk_source=risk_source,
             escalated_to=escalated_to,
             tenant_id=tenant_id,
             user_id=user_id,

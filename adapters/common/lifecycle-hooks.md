@@ -1,5 +1,7 @@
 # Lifecycle Hooks
 
+**Product scope: [OSS].**
+
 ## Core hook moments
 
 Across most frameworks, Pawly logic should be attached at the following moments.

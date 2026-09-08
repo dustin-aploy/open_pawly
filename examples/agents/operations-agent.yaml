@@ -1,3 +1,4 @@
+# [OSS Example] Runs locally with Open Pawly; no Cloud account required.
 # Operations Helper: handles simple internal operations requests and hands off
 # risky or production-impacting work to a human operations lead.
 metadata:

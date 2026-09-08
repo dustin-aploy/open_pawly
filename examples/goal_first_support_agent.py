@@ -1,3 +1,5 @@
+"""[OSS Example] Local goal-first Open Pawly support agent; no Cloud account required."""
+
 from __future__ import annotations
 
 import json

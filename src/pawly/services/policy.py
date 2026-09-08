@@ -62,7 +62,7 @@ class PolicyService:
             {
                 "level": "info",
                 "code": "cloud_policy_selected",
-                "message": "Cloud policy is selected when available; local rules remain available during development.",
+                "message": "Cloud Plus or Pro Policy is selected when available; local rules remain available during development.",
                 "action": f"Open {dashboard_url} to review policy configuration.",
             }
         ]
@@ -72,7 +72,7 @@ class PolicyService:
                 {
                     "level": "warning",
                     "code": "missing_api_key",
-                    "message": "Cloud policy is selected but no PAWLY_API_KEY is configured.",
+                    "message": "Cloud Plus or Pro Policy is selected but no PAWLY_API_KEY is configured.",
                     "action": f"Create or copy a cloud key at {dashboard_url}.",
                 },
             )

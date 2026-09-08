@@ -1,3 +1,5 @@
+"""[OSS Example] Local Open Pawly execution gateway; no Cloud account required."""
+
 from __future__ import annotations
 
 import json

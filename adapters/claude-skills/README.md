@@ -1,8 +1,10 @@
 # Claude Skills Adapter Notes
 
+**Product scope: [OSS].**
+
 ## Conceptual mapping
 
-Claude Skills-style systems center more on bounded task capabilities and invocation patterns than on a monolithic runtime. Paw should therefore wrap skill invocation boundaries and any side-effecting actions a skill may trigger.
+Claude Skills-style systems center more on bounded task capabilities and invocation patterns than on a monolithic runtime. Pawly should therefore wrap skill invocation boundaries and any side-effecting actions a skill may trigger.
 
 ## Where pre-action scope/authority checks should happen
 
@@ -22,4 +24,4 @@ Before recursive or repeated skill execution, large tool usage bursts, or expens
 
 ## What is intentionally not implemented here
 
-This directory does not implement a Claude runtime, skill installer, hosted sandbox, or workflow engine. It demonstrates a thin gateway-backed wrapper around the skill execution boundary.
+This directory demonstrates a thin gateway-backed wrapper around the skill execution boundary.

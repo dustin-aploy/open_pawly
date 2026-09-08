@@ -1,8 +1,10 @@
 # LangGraph Adapter Notes
 
+**Product scope: [OSS].**
+
 ## Conceptual mapping
 
-LangGraph-style systems expose graph nodes and edges as the main lifecycle shape. Paw should attach to node transitions that produce side effects, tool calls, external communication, or irreversible state changes.
+LangGraph-style systems expose graph nodes and edges as the main lifecycle shape. Pawly should attach to node transitions that produce side effects, tool calls, external communication, or irreversible state changes.
 
 ## Where pre-action scope/authority checks should happen
 
@@ -22,4 +24,4 @@ Before loops, retries, expensive branches, or fan-out patterns that can material
 
 ## What is intentionally not implemented here
 
-This directory does not implement a LangGraph runtime binding, graph compiler plugin, or durable execution layer. It only shows the shape of a lightweight Paw-aware wrapper.
+This directory does not implement a LangGraph runtime binding, graph compiler plugin, or durable execution layer. It only shows the shape of a lightweight Pawly-aware wrapper.

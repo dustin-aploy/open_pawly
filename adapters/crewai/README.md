@@ -1,8 +1,10 @@
 # CrewAI Adapter Notes
 
+**Product scope: [OSS].**
+
 ## Conceptual mapping
 
-Crew-style systems often model agents, tasks, and delegations. Paw should sit around task dispatch, delegation approval, and side-effecting task completion rather than trying to replace the crew orchestration model.
+Crew-style systems often model agents, tasks, and delegations. Pawly should sit around task dispatch, delegation approval, and side-effecting task completion rather than trying to replace the crew orchestration model.
 
 ## Where pre-action scope/authority checks should happen
 

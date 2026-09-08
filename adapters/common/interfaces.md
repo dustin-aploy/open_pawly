@@ -1,8 +1,10 @@
 # Thin Adapter Interfaces
 
+**Product scope: [OSS].**
+
 ## Principle
 
-A thin Paw adapter should expose only the minimum structure needed to:
+A thin Pawly adapter should expose only the minimum structure needed to:
 
 - describe an action about to happen;
 - request a scope/authority/budget decision;
@@ -15,8 +17,8 @@ A thin Paw adapter should expose only the minimum structure needed to:
 A framework adapter usually needs three kinds of objects:
 
 1. **Action context** — a small record describing the current task, action name, confidence, metadata, and optional framework-native payload.
-2. **Policy gateway** — a callable surface that asks the Paw layer for pre-action checks, local approval handling, and audit logging.
-3. **Framework callback wrapper** — a tiny shim that translates framework lifecycle events into Paw-shaped calls.
+2. **Policy gateway** — a callable surface that asks the Pawly layer for pre-action checks, local approval handling, and audit logging.
+3. **Framework callback wrapper** — a tiny shim that translates framework lifecycle events into Pawly-shaped calls.
 
 ## What adapters should not own
 

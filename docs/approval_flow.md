@@ -8,7 +8,7 @@ The Open Pawly implementation stays lightweight:
 - in-memory or file-backed queue
 - local callback approval handler
 - timeout-based expiry
-- no cloud dependency
+- no required network dependency
 
 ## Core flow
 

@@ -1,11 +1,11 @@
-from __future__ import annotations
-
-"""Advanced candidate-action routing example for adapter maintainers.
+"""[OSS Example] Advanced candidate-action policy example for adapter maintainers.
 
 Application developers should start with goal_first_support_agent.py and
 Pawly(...).achieve(...). This file shows the lower-level path used after a
 framework adapter has already built explicit candidate actions.
 """
+
+from __future__ import annotations
 
 import json
 from pathlib import Path
