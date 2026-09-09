@@ -1,5 +1,7 @@
 # Advanced Candidate-Action Policy Control
 
+**Product scope: [OSS].**
+
 In this document `pawly` means the open-source package published from `open_pawly`.
 
 Pawly supports a lower-level path that applies local Policy to candidate actions

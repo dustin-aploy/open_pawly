@@ -1,5 +1,7 @@
 # Pawprint Policy Engine
 
+**Product scope: [OSS].**
+
 The Pawprint policy engine evaluates the action boundary declared by a
 developer. It is deterministic and runs locally.
 

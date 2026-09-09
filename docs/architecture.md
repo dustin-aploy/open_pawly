@@ -1,5 +1,7 @@
 # Open Pawly Architecture
 
+**Product scope: [OSS].**
+
 Open Pawly is a local execution boundary for an agent. Your application plans
 the work; Pawly decides whether a registered Skill action may run, handles a
 review when needed, executes the action, and writes a receipt.

@@ -1,5 +1,7 @@
 # Advanced: Execution Gateway
 
+**Product scope: [OSS].**
+
 In this document `pawly` means the open-source package published from `open_pawly`.
 
 Executor wrapping is an advanced migration path.

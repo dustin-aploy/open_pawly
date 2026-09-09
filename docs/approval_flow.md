@@ -1,5 +1,7 @@
 # Approval Flow
 
+**Product scope: [OSS].**
+
 In this document `pawly` means the open-source package published from `open_pawly`.
 
 Pawly now treats `require_approval` as a real runtime path.

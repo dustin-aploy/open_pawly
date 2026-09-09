@@ -1,5 +1,7 @@
 # Audit And Replay
 
+**Product scope: [OSS].**
+
 In this document `pawly` means the open-source package published from `open_pawly`.
 
 Pawly now emits two local-first JSONL audit shapes during governed execution:
