@@ -1,5 +1,7 @@
 # Skill Action Pawprints
 
+**Product scope: [OSS].**
+
 Pawprint can be generated from `SkillService` action names. The compact form is
 a Skill/action decision table:
 

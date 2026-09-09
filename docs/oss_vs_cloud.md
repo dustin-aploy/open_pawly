@@ -1,5 +1,7 @@
 # Open Pawly and Pawly Cloud
 
+**Product scope: [OSS].** Cloud is described only to explain the upgrade boundary.
+
 Open Pawly is the local execution runtime. It gives an agent a declared action
 boundary, deterministic decisions, approvals, and local audit receipts.
 

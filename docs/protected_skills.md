@@ -1,5 +1,7 @@
 # Skill Protection Compatibility
 
+**Product scope: [OSS].**
+
 In this document `pawly` means the open-source package published from `open_pawly`.
 
 `pawly` reads the optional skill-protection metadata declared in `pawprint`.
